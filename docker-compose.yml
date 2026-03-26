@@ -1,0 +1,24 @@
+services:
+  backend:
+    build: ./backend
+    container_name: odyssey-backend
+    ports:
+      - "7689:8000"
+    volumes:
+      - ./backend:/app
+      - uptime-db:/app/data
+    restart: always
+
+  frontend:
+    build: ./frontend
+    container_name: odyssey-frontend
+    ports:
+      - "8755:80"
+    depends_on:
+      - backend
+    volumes:
+      - ./Odyssey.png:/usr/share/nginx/html/Odyssey.png
+    restart: always
+
+volumes:
+  uptime-db:

@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+sqlalchemy
+requests
+pydantic
+python-multipart
+psutil
