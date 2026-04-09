@@ -13,6 +13,7 @@ class Site(Base):
     latency = Column(Float, nullable=True)
     external_status = Column(String, nullable=True)
     last_checked = Column(DateTime, nullable=True)
+    outage_count = Column(Integer, default=0)  # external downtime count
     history = relationship("History", back_populates="site", cascade="all, delete-orphan")
 
 class History(Base):
@@ -31,4 +32,13 @@ class SystemHistory(Base):
     cpu = Column(Float)
     ram = Column(Float)
     disk = Column(Float)
-    gpu = Column(Float, nullable=True) # utilization percentage
+    gpu = Column(Float, nullable=True)
+    network_online = Column(Integer, default=1)  # 1=online, 0=offline
+
+class OutageEvent(Base):
+    __tablename__ = "outage_events"
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+    outage_type = Column(String)  # 'network' | 'power'
+    started_at = Column(DateTime)
+    ended_at = Column(DateTime, nullable=True)  # null = ongoing

@@ -20,9 +20,16 @@ const Icon = ({ name, size = 16, ...props }) => {
 
 const ICONS = Object.keys(IconMap);
 
+// Format latency: 999ms → "999 ms", 1000ms → "1k ms", 1345ms → "1.3k ms"
+const formatLatency = (ms) => {
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  if (ms < 10000) return `${(ms / 1000).toFixed(1)}k ms`;
+  return `${Math.round(ms / 1000)}k ms`;
+};
+
 const App = () => {
   const [sites, setSites] = useState([]);
-  const [stats, setStats] = useState({ up: 0, down: 0, avg_latency: 0, overall_uptime: 0, total_outages: 0, network_latency: null });
+  const [stats, setStats] = useState({ up: 0, down: 0, avg_latency: 0, overall_uptime: 0, total_outages: 0, network_latency: null, network_outages: 0, power_outages: 0, current_outage: null, connectivity_history: [] });
   const [systemMetrics, setSystemMetrics] = useState({ cpu: 0, memory: { percent: 0 }, disk: { percent: 0 }, uptime: 0, temp: { cpu: null, gpu: null } });
   const [systemHistory, setSystemHistory] = useState([]);
   const [theme, setTheme] = useState(localStorage.getItem('odyssey_theme') || 'dark');
@@ -32,6 +39,9 @@ const App = () => {
   const [lastCheckTime, setLastCheckTime] = useState(null);
   const [timeAgo, setTimeAgo] = useState('—');
   const [isLoading, setIsLoading] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [customName, setCustomName] = useState(localStorage.getItem('odyssey_custom_name') || '');
+  const [customLogo, setCustomLogo] = useState(localStorage.getItem('odyssey_custom_logo') || null);
 
   const fetchSites = async () => {
     try {
@@ -107,6 +117,24 @@ const App = () => {
   }, [theme]);
 
   const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
+  const toggleSettings = () => setSettingsOpen(!settingsOpen);
+
+  const handleCustomNameChange = (val) => {
+    setCustomName(val);
+    localStorage.setItem('odyssey_custom_name', val);
+  };
+
+  const handleLogoUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target.result;
+      setCustomLogo(dataUrl);
+      localStorage.setItem('odyssey_custom_logo', dataUrl);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleAddSite = async () => {
     if (!newSite.name || !newSite.url) return;
@@ -226,6 +254,60 @@ const App = () => {
 
   // Dial Helpers
   const arc = 219.9;
+  // Latency thresholds: LAN 0-49ms, Fast 50-100ms, Average 101-2000ms, Slow 2000ms+
+  const getLatencyLabel = (lat) => {
+    if (lat === null || lat === undefined) return '—';
+    if (lat < 50) return 'LAN';
+    if (lat <= 100) return 'Fast';
+    if (lat <= 2000) return 'Average';
+    return 'Slow';
+  };
+  const getLatencyColor = (lat) => {
+    if (lat === null || lat === undefined) return 'var(--text3)';
+    if (lat <= 100) return 'var(--up)';
+    if (lat <= 2000) return 'var(--degraded)';
+    return 'var(--down)';
+  };
+
+  // Connectivity history chart for server outages
+  const connectivityChartData = {
+    labels: (stats.connectivity_history || []).map(h => new Date(h.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })),
+    datasets: [{
+      label: 'Server Online',
+      data: (stats.connectivity_history || []).map(h => h.online ? 1 : 0),
+      borderColor: '#2fa87e',
+      backgroundColor: 'rgba(47,168,126,0.15)',
+      borderWidth: 1.5,
+      pointRadius: 2,
+      pointBackgroundColor: '#2fa87e',
+      tension: 0.4,
+      fill: true,
+      stepped: 'before',
+    }]
+  };
+
+  const connectivityChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 500 },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a1816',
+        titleColor: '#f2ede4',
+        bodyColor: '#8a8278',
+        borderColor: '#332e28',
+        borderWidth: 1,
+        titleFont: { family: 'DM Mono', size: 10 },
+        bodyFont: { family: 'DM Mono', size: 10 },
+      }
+    },
+    scales: {
+      x: { grid: { color: 'rgba(200,200,200,0.05)', display: false }, ticks: { color: '#55504a', font: { family: 'DM Mono', size: 9 }, maxTicksLimit: 10 } },
+      y: { grid: { color: 'rgba(200,200,200,0.05)' }, ticks: { color: '#55504a', font: { family: 'DM Mono', size: 9 }, beginAtZero: true, max: 1 } },
+    }
+  };
+
   const getDialStyle = (pct) => ({
     strokeDashoffset: arc - (Math.min(100, Math.max(0, pct)) / 100) * arc,
     transition: 'stroke-dashoffset 1s ease'
@@ -247,20 +329,95 @@ const App = () => {
       <header>
         <div className="logo">
           <div className="logo-circle">
-            <img src="/Odyssey.png" alt="Odyssey" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            {customLogo ? (
+              <img src={customLogo} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <img src="/Odyssey.png" alt="Odyssey" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            )}
           </div>
-          <span className="logo-text">Odyssey</span>
+          <span className="logo-text">{customName || 'Odyssey'}</span>
         </div>
         <div className="header-right">
-          <span className="last-check-label">{timeAgo}</span>
-          <button className="btn btn-accent" onClick={() => setIsModalOpen(true)}>
-            <Plus size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} /> Add Site
-          </button>
-          <button className="theme-toggle" onClick={toggleTheme}>
-            {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
-          </button>
+          <button className="settings-icon" onClick={toggleSettings}>⚙</button>
         </div>
       </header>
+
+      {/* Settings Panel */}
+      <div className={`settings-panel ${settingsOpen ? 'open' : ''}`}>
+        <div className="settings-panel-header">
+          <span className="settings-panel-title">Settings</span>
+          <button className="settings-icon" onClick={toggleSettings} style={{ width: 28, height: 28 }}>✕</button>
+        </div>
+        <div className="settings-section">
+          <label>Custom Tab Name</label>
+          <input type="text" value={customName} onChange={(e) => handleCustomNameChange(e.target.value)} placeholder="e.g. My Server" />
+        </div>
+        <div className="settings-section">
+          <label>Custom Logo</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div className="logo-circle" style={{ width: 28, height: 28, cursor: 'pointer' }} onClick={() => document.getElementById('logo-upload-input').click()}>
+              {customLogo ? (
+                <img src={customLogo} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+              ) : (
+                <div className="logo-circle-placeholder" style={{ width: 14, height: 14, borderRadius: '50%', background: 'var(--accent)', opacity: 0.5 }} />
+              )}
+            </div>
+            <button className="logo-upload-btn" onClick={() => document.getElementById('logo-upload-input').click()}>Upload Image</button>
+            <input id="logo-upload-input" type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
+          </div>
+        </div>
+        <div className="settings-section">
+          <label>Add Site</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <input
+              type="text"
+              value={newSite.name}
+              onChange={(e) => setNewSite({ ...newSite, name: e.target.value })}
+              placeholder="Site Name"
+            />
+            <input
+              type="text"
+              value={newSite.url}
+              onChange={(e) => setNewSite({ ...newSite, url: e.target.value })}
+              placeholder="URL (e.g. https://example.com)"
+            />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.3rem', marginTop: '0.3rem' }}>
+              {ICONS.map(icon => (
+                <button
+                  key={icon}
+                  className={`icon-btn ${newSite.icon === icon ? 'active' : ''}`}
+                  onClick={() => setNewSite({ ...newSite, icon })}
+                  style={{ width: 32, height: 32 }}
+                >
+                  <Icon name={icon} size={14} />
+                </button>
+              ))}
+            </div>
+            <button
+              className="btn btn-accent"
+              onClick={() => {
+                if (!newSite.name || !newSite.url) return;
+                let url = newSite.url;
+                if (!url.startsWith('http')) url = 'https://' + url;
+                handleAddSite({ ...newSite, url });
+                setNewSite({ name: '', url: '', icon: 'Globe' });
+                setSettingsOpen(false);
+              }}
+              style={{ alignSelf: 'flex-end', marginTop: '0.3rem' }}
+            >
+              + Add Site
+            </button>
+          </div>
+        </div>
+        <div className="settings-section">
+          <div className="theme-row">
+            <span>Dark Mode</span>
+            <button className="theme-toggle" onClick={toggleTheme}>
+              {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
+          </div>
+        </div>
+      </div>
 
       <div className="main">
         <div className="hero">
@@ -342,13 +499,20 @@ const App = () => {
           </div>
           <div className="stat-card warn">
             <div className="stat-label">Average Latency</div>
-            <div className="stat-value">{Math.round(stats.avg_latency)}ms</div>
-            <div className="stat-sub">system performance</div>
+            <div className="stat-value">{formatLatency(stats.avg_latency)}</div>
+            <div className="stat-sub">external only</div>
           </div>
           <div className="stat-card neutral">
-            <div className="stat-label">Overall Uptime</div>
-            <div className="stat-value">{Math.round(stats.overall_uptime)}%</div>
-            <div className="stat-sub">total system health</div>
+            <div className="outage-wrap">
+              <div className="stat-label">Server Outages</div>
+              <div className="stat-value">{(stats.network_outages || 0) + (stats.power_outages || 0)}</div>
+              <div className="outage-tooltip">
+                <div>Network outages: {stats.network_outages || 0}</div>
+                <div>Power outages: {stats.power_outages || 0}</div>
+                {stats.current_outage && <div style={{ color: 'var(--down)' }}>Currently offline!</div>}
+              </div>
+              <div className="stat-sub">internet / power</div>
+            </div>
           </div>
         </div>
 
@@ -360,14 +524,6 @@ const App = () => {
               <path d="M30,120 A70,70,0,0,1,170,120" fill="none" stroke="var(--down)" stroke-width="12" stroke-linecap="round" strokeDasharray={arc} style={getDialStyle((stats.total_outages / 28) * 100)} />
               <text x="100" y="115" textAnchor="middle" fontFamily="Syne,sans-serif" fontSize="22" fontWeight="800" fill="var(--text)">{stats.total_outages}</text>
               <text x="100" y="130" textAnchor="middle" fontFamily="DM Moto,sans-serif" fontSize="8" fill="var(--text2)">last 24h</text>
-            </svg>
-          </div>
-          <div className="dial-card">
-            <div className="dial-label">Avg Response</div>
-            <svg className="dial-svg" width="180" height="120" viewBox="0 0 200 130">
-              <path d="M30,120 A70,70,0,0,1,170,120" fill="none" stroke="var(--surface3)" stroke-width="12" stroke-linecap="round" />
-              <path d="M30,120 A70,70,0,0,1,170,120" fill="none" stroke="var(--accent2)" stroke-width="12" stroke-linecap="round" strokeDasharray={arc} style={getDialStyle(Math.max(0, 100 - stats.avg_latency / 20))} />
-              <text x="100" y="115" textAnchor="middle" fontFamily="Syne,sans-serif" fontSize="22" fontWeight="800" fill="var(--text)">{Math.round(stats.avg_latency)}ms</text>
             </svg>
           </div>
           <div className="dial-card">
@@ -397,15 +553,16 @@ const App = () => {
               <div className="col-h">Status</div>
               <div className="col-h">Ping</div>
               <div className="col-h">Latency</div>
+              <div className="col-h" style={{ textAlign: 'right' }}>Outages</div>
               <div></div>
             </div>
             <div id="siteList">
               {safeSites.length === 0 ? (
-                <div className="empty-state">No sites added yet — click + Add Site to begin.</div>
+                <div className="empty-state">No sites added yet — add sites to begin.</div>
               ) : (
                 safeSites.map(site => site && (
                   <div key={site.id} className="site-row clickable" onClick={() => site.url && window.open(site.url, '_blank')}>
-                    <div className={`status-dot ${site.status === 'success' ? 'up' : site.status === 'lan_up' ? 'slow' : (site.status || 'down')}`} title={site.status === 'lan_up' ? 'Reachable via LAN' : 'Status'}></div>
+                    <div className={`status-dot ${site.status === 'success' ? 'online' : site.status === 'lan_up' ? 'lan' : site.status === 'slow' ? 'degraded' : 'offline'}`} title={site.status === 'lan_up' ? 'Reachable via LAN' : site.status === 'slow' ? 'Degraded' : site.status === 'success' ? 'Online' : 'Offline'}></div>
                     <div>
                       <div className="site-name">
                         <Icon name={site.icon} size={18} style={{ marginRight: '8px', color: 'var(--text2)' }} />
@@ -413,8 +570,8 @@ const App = () => {
                       </div>
                       <div className="site-url">{site.url ? site.url.replace(/^https?:\/\//, '') : ''}</div>
                     </div>
-                    <div className={`badge ${site.status === 'success' ? 'up' : site.status === 'lan_up' ? 'slow' : (site.status || 'down')}`}>
-                      {(site.status === 'success' || site.status === 'lan_up') ? 'ONLINE' : (site.status || 'down').toUpperCase()}
+                    <div className={`badge ${site.status === 'success' ? 'online' : site.status === 'lan_up' ? 'lan' : site.status === 'slow' ? 'degraded' : 'offline'}`}>
+                      {site.status === 'success' ? 'Online' : site.status === 'lan_up' ? 'LAN' : site.status === 'slow' ? 'Slow' : 'Offline'}
                     </div>
                     <div className="ping-val">{site.latency ? `${Math.round(site.latency)}ms` : '—'}</div>
                     <div>
@@ -423,13 +580,16 @@ const App = () => {
                           className="latency-fill"
                           style={{
                             width: `${Math.min((site.latency || 0) / 20, 100)}%`,
-                            background: (site.latency || 0) > 1000 ? 'var(--down)' : (site.latency || 0) > 500 ? 'var(--slow)' : 'var(--up)'
+                            background: (site.latency || 0) >= 3000 ? 'var(--down)' : (site.latency || 0) >= 2000 ? 'var(--degraded)' : 'var(--up)'
                           }}
                         ></div>
                       </div>
-                      <div className="latency-sub">
-                        {site.latency ? (site.latency < 300 ? 'Fast' : site.latency < 800 ? 'Moderate' : 'Slow') : '—'}
+                      <div className="latency-sub" style={{ color: (site.latency || 0) >= 3000 ? 'var(--down)' : (site.latency || 0) >= 2000 ? 'var(--degraded)' : 'var(--up)' }}>
+                        {site.latency ? (site.latency < 100 ? 'Very Fast' : site.latency < 2000 ? 'Fast' : site.latency < 3000 ? 'Slow' : 'Very Slow') : '—'}
                       </div>
+                    </div>
+                    <div className="outage-badge" title="External outages recorded">
+                      {(site.outage_count || 0) > 0 ? `${site.outage_count} ↓` : '—'}
                     </div>
                     <div style={{ display: 'flex', gap: '4px' }} onClick={(e) => e.stopPropagation()}>
                       <button className="delete-btn" onClick={() => handleEditSite(site)} title="Edit">
@@ -491,10 +651,20 @@ const App = () => {
                 <span className="last-check-label">RAM trend</span>
               </div>
               <div className="chart-wrap" style={{ height: '180px' }}>
-                <Line 
-                  data={memoryChartData} 
-                  options={{ ...chartOptions, scales: { ...chartOptions.scales, y: { ...chartOptions.scales.y, min: 0, max: 100, ticks: { ...chartOptions.scales.y.ticks, stepSize: 20 } } } }} 
+                <Line
+                  data={memoryChartData}
+                  options={{ ...chartOptions, scales: { ...chartOptions.scales, y: { ...chartOptions.scales.y, min: 0, max: 100, ticks: { ...chartOptions.scales.y.ticks, stepSize: 20 } } } }}
                 />
+              </div>
+            </div>
+
+            <div className="panel">
+              <div className="panel-header">
+                <span className="panel-title">Server Connectivity</span>
+                <span className="last-check-label">internet history</span>
+              </div>
+              <div className="chart-wrap" style={{ height: '120px' }}>
+                <Line data={connectivityChartData} options={connectivityChartOptions} />
               </div>
             </div>
           </div>

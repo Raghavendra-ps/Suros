@@ -63,6 +63,7 @@ class SiteSchema(SiteBase):
     latency: Optional[float]
     last_checked: Optional[datetime]
     external_status: Optional[str] = None
+    outage_count: int = 0
     history: List[HistorySchema] = []
 
     class Config:
@@ -70,7 +71,6 @@ class SiteSchema(SiteBase):
 
 import subprocess
 
-# --- Monitoring Logic ---
 def check_site_status(url: str):
     t0 = time.time()
     try:
@@ -81,50 +81,63 @@ def check_site_status(url: str):
         is_local_ip = is_ip or domain in ['localhost', '127.0.0.1']
 
         if is_local_ip:
-            # LAN Check (IPs)
+            # LAN Check (IPs) — reachable locally
             response = requests.get(url, timeout=5)
             latency = (time.time() - t0) * 1000
             if response.status_code < 400:
-                # IPs are always "LAN UP" (Yellow)
-                return "lan_up", latency
+                return "success", latency
             return "down", latency
         else:
-            # WAN Check (Domains)
+            # WAN Check (Domains) — public internet check via isitup.org
             try:
-                # Primary: WAN check via isitup.org
                 ext_res = requests.get(f"https://isitup.org/{domain}.json", timeout=3)
                 if ext_res.status_code == 200:
                     data = ext_res.json()
                     if data.get('status_code') == 1:
-                        # Success on WAN (Green)
+                        # Domain is up on public internet
                         try:
                             l_res = requests.get(url, timeout=2)
                             latency = (time.time() - t0) * 1000
+                            # If latency < 100ms, treat as local/LAN
+                            if latency is not None and latency < 100:
+                                return "lan_up", latency
                         except:
                             latency = None
                         return "success", latency
                     elif data.get('status_code') == 2:
-                        # WAN Down, check LAN fallback
-                        response = requests.get(url, timeout=5)
-                        if response.status_code < 400:
-                            return "lan_up", (time.time() - t0) * 1000
+                        # Domain is down globally — check local LAN fallback
+                        try:
+                            response = requests.get(url, timeout=5)
+                            if response.status_code < 400:
+                                latency = (time.time() - t0) * 1000
+                                # If latency < 100ms, treat as local/LAN
+                                if latency < 100:
+                                    return "lan_up", latency
+                                return "lan_up", latency
+                        except:
+                            pass
                         return "down", None
             except:
                 pass
-            
-            # Final Fallback
+
+            # Final fallback — direct HTTP check
             response = requests.get(url, timeout=5)
             latency = (time.time() - t0) * 1000
             if response.status_code < 400:
-                return "lan_up" if latency < 2000 else "slow", latency
+                # If latency < 100ms, treat as local/LAN
+                if latency < 100:
+                    return "lan_up", latency
+                return "success", latency
             return "down", latency
-            
+
     except Exception:
         return "down", None
 
 def get_gpu_metrics():
+    """Query NVIDIA GPU metrics via nvidia-smi. Returns None if unavailable (no proprietary driver)."""
     try:
-        # Querying NVIDIA GPU utilization, memory, and temperature
+        # Check if nvidia-smi exists first
+        subprocess.check_call(["which", "nvidia-smi"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         cmd = ["nvidia-smi", "--query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu", "--format=csv,noheader,nounits"]
         output = subprocess.check_output(cmd, encoding='utf-8').strip()
         if output:
@@ -167,6 +180,30 @@ last_net_sent = psutil.net_io_counters().bytes_sent
 last_net_time = time.time()
 net_out_rate = 0 # Mbps
 
+# Server outage tracking
+last_network_online = True
+current_outage_type = None   # 'network' | 'power'
+current_outage_start = None
+
+def is_internet_reachable():
+    """Returns True if internet is reachable (ping 1.1.1.1:53), False otherwise."""
+    try:
+        import socket
+        socket.create_connection(("1.1.1.1", 53), timeout=2)
+        return True
+    except:
+        return False
+
+def get_external_latency():
+    """Ping 1.1.1.1 and return latency in ms. Returns None if unreachable."""
+    try:
+        import socket
+        start = time.time()
+        socket.create_connection(("1.1.1.1", 53), timeout=2)
+        return round((time.time() - start) * 1000)
+    except:
+        return None
+
 async def monitor_sites_task():
     global net_out_rate, last_net_sent, last_net_time
     while True:
@@ -182,50 +219,98 @@ async def monitor_sites_task():
 
         db = SessionLocal()
         try:
+            global last_network_online, current_outage_type, current_outage_start
+
+            # Check server internet connectivity
+            server_online = is_internet_reachable()
+            net_lat = get_external_latency()
+
+            # Detect network outage transitions
+            if server_online and not last_network_online:
+                # Network came back online — close the open outage
+                if current_outage_type == 'network' and current_outage_start:
+                    open_events = db.query(models.OutageEvent).filter(
+                        models.OutageEvent.outage_type == 'network',
+                        models.OutageEvent.ended_at.is_(None)
+                    ).all()
+                    for ev in open_events:
+                        ev.ended_at = datetime.utcnow()
+                    current_outage_type = None
+                    current_outage_start = None
+
+            if not server_online and last_network_online:
+                # Network went offline — start a new outage
+                new_outage = models.OutageEvent(
+                    outage_type='network',
+                    started_at=datetime.utcnow(),
+                    ended_at=None
+                )
+                db.add(new_outage)
+                current_outage_type = 'network'
+                current_outage_start = datetime.utcnow()
+
+            last_network_online = server_online
+
             # Update Site Metrics
             sites = db.query(models.Site).all()
             for site in sites:
                 status, latency = check_site_status(site.url)
                 site.status = status
-                site.latency = latency
+                # Use the latency from the site-specific check, not the shared external ping
+                site.latency = latency if latency is not None else net_lat
                 site.last_checked = datetime.utcnow()
-                
+
+                # Detect external outages for sites (when status becomes 'down' not 'lan_up')
+                # We'll count transitions into 'down' from any other status
+                # Check last history entry for this site
+                last_h = db.query(models.History).filter(
+                    models.History.site_id == site.id
+                ).order_by(models.History.timestamp.desc()).first()
+
+                was_down = last_h.status == 'down' if last_h else False
+                is_down = status == 'down'
+
+                if is_down and not was_down:
+                    # Site went down externally — increment outage count
+                    site.outage_count = (site.outage_count or 0) + 1
+
                 # Add site history entry
                 history_entry = models.History(
                     site_id=site.id,
                     status=status,
-                    latency=latency
+                    latency=latency if latency is not None else net_lat
                 )
                 db.add(history_entry)
-                
+
                 # Keep last 2880 checks (24 hours at 30s intervals)
                 history_count = db.query(models.History).filter(models.History.site_id == site.id).count()
                 if history_count > 2880:
                     oldest = db.query(models.History).filter(models.History.site_id == site.id).order_by(models.History.timestamp.asc()).first()
                     db.delete(oldest)
 
-            # Update System History
+            # Update System History with server connectivity info
             gpu_metrics = get_gpu_metrics()
             sys_history = models.SystemHistory(
                 cpu=psutil.cpu_percent(),
                 ram=psutil.virtual_memory().percent,
                 disk=psutil.disk_usage('/').percent,
-                gpu=gpu_metrics['util'] if gpu_metrics else None
+                gpu=gpu_metrics['util'] if gpu_metrics else None,
+                network_online=1 if server_online else 0
             )
             db.add(sys_history)
-            
+
             # Keep last 2880 system snapshots (24 hours at 30s intervals)
             sys_count = db.query(models.SystemHistory).count()
             if sys_count > 2880:
                 oldest_sys = db.query(models.SystemHistory).order_by(models.SystemHistory.timestamp.asc()).first()
                 db.delete(oldest_sys)
-                
+
             db.commit()
         except Exception as e:
             print(f"Monitor task error: {e}")
         finally:
             db.close()
-        
+
         # Check every 30 seconds for live updates
         await asyncio.sleep(30)
 
@@ -340,12 +425,23 @@ def delete_site(site_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Site deleted"}
 
+@app.get("/api/site-outages/{site_id}")
+def get_site_outages(site_id: int, db: Session = Depends(get_db)):
+    """Get external outage count for a specific site."""
+    site = db.query(models.Site).filter(models.Site.id == site_id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    return {"site_id": site_id, "outage_count": site.outage_count}
+
 @app.get("/api/stats")
 def get_stats(db: Session = Depends(get_db)):
     sites = db.query(models.Site).all()
     up = len([s for s in sites if s.status == "success"])
+    # Up = success (fully reachable) or lan_up (LAN reachable but WAN down)
+    up = len([s for s in sites if s.status == "success" or s.status == "lan_up"])
+    # Down = confirmed unreachable OR still pending first check
     down = len([s for s in sites if s.status == "down" or s.status == "pending"])
-    
+
     latencies = [s.latency for s in sites if s.latency is not None]
     avg_latency = sum(latencies) / len(latencies) if latencies else 0
     
@@ -364,6 +460,25 @@ def get_stats(db: Session = Depends(get_db)):
                 total_outages += 1
             last_inner_status = h.status
 
+    # Network Outage Count (server internet connectivity lost)
+    network_outages = db.query(models.OutageEvent).filter(
+        models.OutageEvent.outage_type == 'network'
+    ).count()
+    power_outages = db.query(models.OutageEvent).filter(
+        models.OutageEvent.outage_type == 'power'
+    ).count()
+
+    # Current ongoing outage
+    current_outage = None
+    open_outage = db.query(models.OutageEvent).filter(
+        models.OutageEvent.ended_at.is_(None)
+    ).first()
+    if open_outage:
+        current_outage = {
+            "type": open_outage.outage_type,
+            "started_at": open_outage.started_at.isoformat()
+        }
+
     # Network Health (Ping 1.1.1.1)
     network_latency = None
     try:
@@ -381,14 +496,25 @@ def get_stats(db: Session = Depends(get_db)):
         models.History.timestamp >= yesterday
     ).count()
     overall_uptime = (up_checks / total_checks * 100) if total_checks > 0 else 0
-    
+
+    # Server connectivity history (last 50 entries)
+    sys_hist = db.query(models.SystemHistory).order_by(models.SystemHistory.timestamp.desc()).limit(50).all()
+    connectivity_history = [
+        {"t": h.timestamp.isoformat(), "online": h.network_online == 1}
+        for h in reversed(sys_hist)
+    ]
+
     return {
         "up": up,
         "down": down,
         "avg_latency": round(avg_latency),
         "overall_uptime": round(overall_uptime),
         "total_outages": total_outages,
-        "network_latency": network_latency
+        "network_latency": network_latency,
+        "network_outages": network_outages,
+        "power_outages": power_outages,
+        "current_outage": current_outage,
+        "connectivity_history": connectivity_history
     }
 
 @app.get("/api/system-history")
