@@ -6,8 +6,10 @@ import subprocess
 import logging
 import os
 import json
-from fastapi import FastAPI, Depends, BackgroundTasks, HTTPException
+from fastapi import FastAPI, Depends, BackgroundTasks, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import models
@@ -39,6 +41,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Static files for uploads
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+os.makedirs(STATIC_DIR, exist_ok=True)
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # --- Pydantic Schemas ---
 class SiteBase(BaseModel):
@@ -541,33 +548,48 @@ def get_system_metrics():
         disk = psutil.disk_usage('/')
         gpu = get_gpu_metrics()
         
-        # Get all disk partitions from both container root and host mount
+        # Get all disk partitions - match lsblk format
         disks = []
-        scan_paths = ['/', '/mnt/host']
+        seen_devices = set()
         
-        for scan_path in scan_paths:
-            try:
-                for partition in psutil.disk_partitions(scan_path):
-                    try:
-                        usage = psutil.disk_usage(partition.mountpoint)
-                        # Skip pseudo filesystems and empty mounts
-                        if usage.total > 0 and partition.fstype not in ('squashfs', 'tmpfs', 'devtmpfs', 'overlay'):
-                            # Check if we already have this mountpoint
-                            if not any(d['mountpoint'] == partition.mountpoint for d in disks):
-                                disks.append({
-                                    "device": partition.device,
-                                    "mountpoint": partition.mountpoint,
-                                    "fstype": partition.fstype,
-                                    "total": round(usage.total / (1024 ** 3), 2),
-                                    "used": round(usage.used / (1024 ** 3), 2),
-                                    "free": round(usage.free / (1024 ** 3), 2),
-                                    "percent": usage.percent
-                                })
-                    except (PermissionError, FileNotFoundError, OSError):
-                        # Skip drives that can't be accessed or don't exist
-                        pass
-            except Exception:
-                pass
+        try:
+            for partition in psutil.disk_partitions():
+                try:
+                    # Skip pseudo filesystems and very small partitions
+                    if partition.fstype in ('squashfs', 'tmpfs', 'devtmpfs', 'overlay', 'proc', 'sysfs', 'devpts'):
+                        continue
+                    
+                    usage = psutil.disk_usage(partition.mountpoint)
+                    if usage.total < 1024 * 1024 * 1024:  # Skip partitions < 1GB
+                        continue
+                    
+                    # Extract device name (e.g., sda2 from /dev/sda2)
+                    device_name = partition.device.split('/')[-1] if partition.device else ''
+                    
+                    # Skip if we've already seen this device
+                    if device_name and device_name in seen_devices:
+                        continue
+                    if device_name:
+                        seen_devices.add(device_name)
+                    
+                    # Skip container-specific paths
+                    mountpoint = partition.mountpoint
+                    if any(x in mountpoint for x in ['/var/lib/docker', '/etc/resolv.conf', '/etc/hostname', '/etc/hosts', '/proc', '/sys', '/dev']):
+                        continue
+                    
+                    disks.append({
+                        "device": device_name,
+                        "mountpoint": mountpoint,
+                        "fstype": partition.fstype,
+                        "total": round(usage.total / (1024 ** 3), 2),
+                        "used": round(usage.used / (1024 ** 3), 2),
+                        "free": round(usage.free / (1024 ** 3), 2),
+                        "percent": usage.percent
+                    })
+                except (PermissionError, FileNotFoundError, OSError, KeyError):
+                    pass
+        except Exception:
+            pass
         
         # Calculate total storage
         total_storage = sum(d["total"] for d in disks)
@@ -608,6 +630,31 @@ def get_system_metrics():
             "total_storage": {"total": 0, "used": 0, "free": 0, "percent": 0},
             "gpu": None, "uptime": 0
         }
+
+@app.post("/api/upload-logo")
+async def upload_logo(file: UploadFile = File(...)):
+    """Upload a logo file to the static folder"""
+    allowed_types = {"image/png", "image/jpeg", "image/gif", "image/svg+xml", "image/webp"}
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Invalid file type. Allowed: PNG, JPEG, GIF, SVG, WebP")
+    
+    filename = f"logo{os.path.splitext(file.filename)[1]}"
+    filepath = os.path.join(STATIC_DIR, filename)
+    
+    with open(filepath, "wb") as f:
+        content = await file.read()
+        f.write(content)
+    
+    return {"url": f"/static/{filename}", "filename": filename}
+
+@app.get("/api/logo")
+def get_logo():
+    """Get the current logo URL"""
+    files = os.listdir(STATIC_DIR)
+    logo_files = [f for f in files if f.startswith("logo.")]
+    if logo_files:
+        return {"url": f"/static/{logo_files[0]}"}
+    return {"url": None}
 
 @app.get("/health")
 def health_check():

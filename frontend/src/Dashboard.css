@@ -244,10 +244,7 @@ header {
 
 .storage-tooltip {
   display: block;
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
+  margin-top: 8px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -258,10 +255,6 @@ header {
   white-space: nowrap;
   z-index: 9999;
   box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-}
-
-.storage-wrap:hover .storage-tooltip {
-  display: block;
 }
 
 .storage-bar-container {
@@ -406,9 +399,7 @@ header {
 }
 
 .outage-tooltip {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  right: 0;
+  margin-top: 8px;
   background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: 3px;
@@ -417,20 +408,10 @@ header {
   font-size: 0.65rem;
   color: var(--text2);
   white-space: nowrap;
-  display: none;
   z-index: 9999;
   box-shadow: 0 8px 24px rgba(0,0,0,0.4);
 }
-.outage-tooltip::after {
-  content: '';
-  position: absolute;
-  top: 100%;
-  right: 12px;
-  border: 5px solid transparent;
-  border-top-color: var(--border);
-}
-.outage-wrap { position: relative; display: inline-block; z-index: 1; }
-.outage-wrap:hover .outage-tooltip { display: block; }
+.outage-wrap { display: inline-block; }
 
 .settings-icon {
   width: 36px; height: 36px;

@@ -1,26 +1,23 @@
 services:
   backend:
     build: ./backend
-    container_name: odyssey-backend
+    container_name: server-monitor-backend
     ports:
       - "7689:8000"
     volumes:
       - ./backend:/app
-      - uptime-db:/app/data
+      - ./backend/static:/app/static
       - /:/mnt/host:ro
     restart: always
     privileged: true
 
   frontend:
     build: ./frontend
-    container_name: odyssey-frontend
+    container_name: server-monitor-frontend
     ports:
       - "8755:80"
     depends_on:
       - backend
     volumes:
-      - ./Odyssey.png:/usr/share/nginx/html/Odyssey.png
+      - ./frontend/static:/usr/share/nginx/html/static:ro
     restart: always
-
-volumes:
-  uptime-db:

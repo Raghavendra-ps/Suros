@@ -124,16 +124,26 @@ const App = () => {
     localStorage.setItem('odyssey_custom_name', val);
   };
 
-  const handleLogoUpload = (e) => {
+  const handleLogoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const dataUrl = ev.target.result;
-      setCustomLogo(dataUrl);
-      localStorage.setItem('odyssey_custom_logo', dataUrl);
-    };
-    reader.readAsDataURL(file);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+      const response = await fetch('/api/upload-logo', {
+        method: 'POST',
+        body: formData
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCustomLogo(data.url);
+        localStorage.setItem('odyssey_custom_logo', data.url);
+      }
+    } catch (err) {
+      console.error('Logo upload failed:', err);
+    }
   };
 
   const handleAddSite = async () => {
@@ -506,19 +516,19 @@ const App = () => {
             <div className="outage-wrap">
               <div className="stat-label">Server Outages</div>
               <div className="stat-value">{(stats.network_outages || 0) + (stats.power_outages || 0)}</div>
+              <div className="stat-sub">internet / power</div>
               <div className="outage-tooltip">
                 <div>Network outages: {stats.network_outages || 0}</div>
                 <div>Power outages: {stats.power_outages || 0}</div>
                 {stats.current_outage && <div style={{ color: 'var(--down)' }}>Currently offline!</div>}
               </div>
-              <div className="stat-sub">internet / power</div>
             </div>
           </div>
         </div>
 
         <div className="dials-row">
           <div className="dial-card">
-            <div className="dial-label">Total Outages</div>
+            <div className="dial-label">Site Outages</div>
             <svg className="dial-svg" width="180" height="120" viewBox="0 0 200 130">
               <path d="M30,120 A70,70,0,0,1,170,120" fill="none" stroke="var(--surface3)" stroke-width="12" stroke-linecap="round" />
               <path d="M30,120 A70,70,0,0,1,170,120" fill="none" stroke="var(--down)" stroke-width="12" stroke-linecap="round" strokeDasharray={arc} style={getDialStyle((stats.total_outages / 28) * 100)} />
@@ -548,9 +558,13 @@ const App = () => {
                 <span className="storage-unit">GB</span>
               </div>
               <div className="storage-tooltip">
-                {systemMetrics.disks?.map((disk, i) => (
-                  <div key={i}>{disk.mountpoint}: {disk.used} / {disk.total} GB ({disk.percent}%)</div>
-                ))}
+                {systemMetrics.disks?.map((disk, i) => {
+                  return (
+                    <div key={i}>
+                      {disk.device} | {disk.total}GB | {disk.mountpoint} | {disk.used}GB ({disk.percent}%)
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
