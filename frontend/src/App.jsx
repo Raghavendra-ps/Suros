@@ -30,7 +30,7 @@ const formatLatency = (ms) => {
 const App = () => {
   const [sites, setSites] = useState([]);
   const [stats, setStats] = useState({ up: 0, down: 0, avg_latency: 0, overall_uptime: 0, total_outages: 0, network_latency: null, network_outages: 0, power_outages: 0, current_outage: null, connectivity_history: [] });
-  const [systemMetrics, setSystemMetrics] = useState({ cpu: 0, memory: { percent: 0 }, disk: { percent: 0 }, uptime: 0, temp: { cpu: null, gpu: null } });
+  const [systemMetrics, setSystemMetrics] = useState({ cpu: 0, memory: { percent: 0 }, disk: { percent: 0 }, total_storage: { total: 0, used: 0, free: 0, percent: 0 }, disks: [], uptime: 0, temp: { cpu: null, gpu: null } });
   const [systemHistory, setSystemHistory] = useState([]);
   const [theme, setTheme] = useState(localStorage.getItem('odyssey_theme') || 'dark');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -534,6 +534,25 @@ const App = () => {
               <text x="100" y="115" textAnchor="middle" fontFamily="Syne,sans-serif" fontSize="22" fontWeight="800" fill="var(--text)">{stats.network_latency ? `${stats.network_latency}ms` : 'OFFLINE'}</text>
               <text x="100" y="130" textAnchor="middle" fontFamily="DM Moto,sans-serif" fontSize="8" fill="var(--text2)">1.1.1.1</text>
             </svg>
+          </div>
+          <div className="dial-card">
+            <div className="dial-label">Storage</div>
+            <div className="storage-wrap">
+              <div className="storage-bar-container">
+                <div className="storage-bar" style={{ width: `${systemMetrics.total_storage?.percent || 0}%`, backgroundColor: systemMetrics.total_storage?.percent < 80 ? 'var(--up)' : systemMetrics.total_storage?.percent < 90 ? 'var(--slow)' : 'var(--down)' }}></div>
+              </div>
+              <div className="storage-metric">
+                <span className="storage-used">{systemMetrics.total_storage?.used || 0}</span>
+                <span className="storage-sep"> / </span>
+                <span className="storage-total">{systemMetrics.total_storage?.total || 0}</span>
+                <span className="storage-unit">GB</span>
+              </div>
+              <div className="storage-tooltip">
+                {systemMetrics.disks?.map((disk, i) => (
+                  <div key={i}>{disk.mountpoint}: {disk.used} / {disk.total} GB ({disk.percent}%)</div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 

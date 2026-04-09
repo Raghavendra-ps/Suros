@@ -7,7 +7,9 @@ services:
     volumes:
       - ./backend:/app
       - uptime-db:/app/data
+      - /:/mnt/host:ro
     restart: always
+    privileged: true
 
   frontend:
     build: ./frontend

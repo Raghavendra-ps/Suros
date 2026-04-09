@@ -1,6 +1,8 @@
 /* Copied from Dashboard.html */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+html, body { overflow-x: visible; }
+
 :root[data-theme="dark"] {
   --bg: #0f0e0d;
   --surface: #1a1816;
@@ -167,6 +169,8 @@ header {
   padding: 1.4rem 1.5rem;
   position: relative;
   transition: background 0.15s;
+  z-index: 1;
+  overflow: visible;
 }
 .stat-card:hover { background: var(--surface2); }
 .stat-card + .stat-card { border-left: 1px solid var(--border); }
@@ -214,6 +218,8 @@ header {
   align-items: center;
   gap: 0.5rem;
   transition: border-color 0.15s;
+  position: relative;
+  overflow: visible;
 }
 .dial-card:hover { border-color: var(--text2); }
 .dial-label {
@@ -226,6 +232,77 @@ header {
   align-self: flex-start;
 }
 .dial-svg { overflow: visible; }
+
+.storage-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: visible;
+  width: 100%;
+}
+
+.storage-tooltip {
+  display: block;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--text);
+  white-space: nowrap;
+  z-index: 9999;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+
+.storage-wrap:hover .storage-tooltip {
+  display: block;
+}
+
+.storage-bar-container {
+  width: 100%;
+  height: 40px;
+  background: var(--surface3);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.storage-bar {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+
+.storage-metric {
+  font-family: 'DM Moto', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.storage-used {
+  color: var(--text);
+}
+
+.storage-sep {
+  color: var(--text2);
+}
+
+.storage-total {
+  color: var(--text2);
+}
+
+.storage-unit {
+  color: var(--text2);
+  font-size: 11px;
+  margin-left: 2px;
+}
 
 /* ── Main Grid ── */
 .grid-2 {
@@ -341,8 +418,8 @@ header {
   color: var(--text2);
   white-space: nowrap;
   display: none;
-  z-index: 50;
-  pointer-events: none;
+  z-index: 9999;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
 }
 .outage-tooltip::after {
   content: '';
@@ -352,7 +429,7 @@ header {
   border: 5px solid transparent;
   border-top-color: var(--border);
 }
-.outage-wrap { position: relative; display: inline-block; }
+.outage-wrap { position: relative; display: inline-block; z-index: 1; }
 .outage-wrap:hover .outage-tooltip { display: block; }
 
 .settings-icon {

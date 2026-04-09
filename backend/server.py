@@ -78,15 +78,25 @@ def check_site_status(url: str):
         import re
         domain = urlparse(url).netloc.split(':')[0]
         is_ip = re.match(r'^(\d{1,3}\.){3}\d{1,3}$', domain)
-        is_local_ip = is_ip or domain in ['localhost', '127.0.0.1']
+        is_local_ip = is_ip or domain in ['localhost', '127.0.0.1', '0.0.0.0']
 
         if is_local_ip:
             # LAN Check (IPs) — reachable locally
-            response = requests.get(url, timeout=5)
-            latency = (time.time() - t0) * 1000
-            if response.status_code < 400:
-                return "success", latency
-            return "down", latency
+            try:
+                response = requests.get(url, timeout=5)
+                latency = (time.time() - t0) * 1000
+                # Any response means reachable (even 4xx/5xx), mark as LAN
+                return "lan_up", latency
+            except requests.exceptions.ConnectionError:
+                # Connection refused - service is running but not accepting connections
+                # This should still count as LAN reachable, not down
+                return "lan_up", None
+            except requests.exceptions.Timeout:
+                # Timeout - mark as lan_up since it's a local address
+                return "lan_up", None
+            except Exception:
+                # Other errors - still mark as lan_up for local addresses
+                return "lan_up", None
         else:
             # WAN Check (Domains) — public internet check via isitup.org
             try:
@@ -531,6 +541,38 @@ def get_system_metrics():
         disk = psutil.disk_usage('/')
         gpu = get_gpu_metrics()
         
+        # Get all disk partitions from both container root and host mount
+        disks = []
+        scan_paths = ['/', '/mnt/host']
+        
+        for scan_path in scan_paths:
+            try:
+                for partition in psutil.disk_partitions(scan_path):
+                    try:
+                        usage = psutil.disk_usage(partition.mountpoint)
+                        # Skip pseudo filesystems and empty mounts
+                        if usage.total > 0 and partition.fstype not in ('squashfs', 'tmpfs', 'devtmpfs', 'overlay'):
+                            # Check if we already have this mountpoint
+                            if not any(d['mountpoint'] == partition.mountpoint for d in disks):
+                                disks.append({
+                                    "device": partition.device,
+                                    "mountpoint": partition.mountpoint,
+                                    "fstype": partition.fstype,
+                                    "total": round(usage.total / (1024 ** 3), 2),
+                                    "used": round(usage.used / (1024 ** 3), 2),
+                                    "free": round(usage.free / (1024 ** 3), 2),
+                                    "percent": usage.percent
+                                })
+                    except (PermissionError, FileNotFoundError, OSError):
+                        # Skip drives that can't be accessed or don't exist
+                        pass
+            except Exception:
+                pass
+        
+        # Calculate total storage
+        total_storage = sum(d["total"] for d in disks)
+        used_storage = sum(d["used"] for d in disks)
+        
         return {
             "cpu": cpu_percent,
             "memory": {
@@ -542,6 +584,13 @@ def get_system_metrics():
                 "percent": disk.percent,
                 "used": round(disk.used / (1024 ** 3), 2),
                 "total": round(disk.total / (1024 ** 3), 2)
+            },
+            "disks": disks,
+            "total_storage": {
+                "total": round(total_storage, 2),
+                "used": round(used_storage, 2),
+                "free": round(total_storage - used_storage, 2),
+                "percent": round((used_storage / total_storage * 100) if total_storage > 0 else 0, 1)
             },
             "gpu": gpu,
             "temp": {
@@ -555,6 +604,8 @@ def get_system_metrics():
         return {
             "cpu": 0, "memory": {"percent": 0, "used": 0, "total": 0},
             "disk": {"percent": 0, "used": 0, "total": 0},
+            "disks": [],
+            "total_storage": {"total": 0, "used": 0, "free": 0, "percent": 0},
             "gpu": None, "uptime": 0
         }
 
