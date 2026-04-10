@@ -380,26 +380,6 @@ async def startup_event():
     logger.info("Backend starting up...")
     try:
         db = SessionLocal()
-        if db.query(models.Site).count() == 0:
-            logger.info("Seeding default sites...")
-            default_sites = [
-                {"name": "Suros", "url": "http://localhost:3001", "icon": "Monitor"},
-                {"name": "Containers", "url": "http://localhost:5001", "icon": "Box"},
-                {"name": "Torrent", "url": "http://localhost:1340", "icon": "HardDrive"},
-                {"name": "Dashboard", "url": "http://localhost:8092", "icon": "Layers"},
-                {"name": "Ads", "url": "http://localhost:8083", "icon": "Globe"},
-                {"name": "Drives", "url": "http://localhost:8097", "icon": "HardDrive"},
-                {"name": "WWW", "url": "http://localhost:8089", "icon": "Globe"},
-                {"name": "Home", "url": "http://localhost:8089", "icon": "Server"},
-                {"name": "Punch", "url": "http://localhost:9999", "icon": "Activity"},
-                {"name": "OpenClaw", "url": "http://localhost:18789", "icon": "Terminal"},
-                {"name": "AI-1", "url": "http://localhost:11434", "icon": "Cpu"},
-                {"name": "AI-2", "url": "http://localhost:11435", "icon": "Cpu"},
-            ]
-            for s in default_sites:
-                db.add(models.Site(**s))
-            db.commit()
-            logger.info(f"Seeded {len(default_sites)} sites.")
         
         # Initialize settings if they don't exist
         if db.query(models.Settings).count() == 0:

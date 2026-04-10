@@ -626,12 +626,13 @@ const App = () => {
                     </div>
                     <div className="ping-val">{site.latency ? `${Math.round(site.latency)}ms` : '—'}</div>
                     <div>
-                      <div className="latency-bar">
+                      <div className="latency-bar" style={site.status === 'lan_up' ? { border: '2px dotted #2fa87e', background: 'transparent' } : {}}>
                         <div
                           className="latency-fill"
                           style={{
-                            width: `${Math.min((site.latency || 0) / 20, 100)}%`,
-                            background: (site.latency || 0) >= 3000 ? 'var(--down)' : (site.latency || 0) >= 2000 ? 'var(--degraded)' : 'var(--up)'
+                            width: site.status === 'lan_up' ? '0%' : `${Math.max(0, 100 - Math.min((site.latency || 0) / 30, 100))}%`,
+                            background: site.status === 'lan_up' ? 'transparent' : (site.latency || 0) >= 3000 ? 'var(--down)' : (site.latency || 0) >= 2000 ? 'var(--degraded)' : 'var(--up)',
+                            border: 'none'
                           }}
                         ></div>
                       </div>
