@@ -40,8 +40,8 @@ const App = () => {
   const [timeAgo, setTimeAgo] = useState('—');
   const [isLoading, setIsLoading] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [customName, setCustomName] = useState(localStorage.getItem('odyssey_custom_name') || '');
-  const [customLogo, setCustomLogo] = useState(localStorage.getItem('odyssey_custom_logo') || null);
+  const [customName, setCustomName] = useState('Odyssey');
+  const [customLogo, setCustomLogo] = useState(null);
 
   const fetchSites = async () => {
     try {
@@ -80,9 +80,19 @@ const App = () => {
     }
   };
 
+  const fetchSettings = async () => {
+    try {
+      const res = await axios.get('/api/settings');
+      setCustomName(res.data.dashboard_name || 'Odyssey');
+      setCustomLogo(res.data.logo_url || null);
+    } catch (err) {
+      console.error('Error fetching settings:', err);
+    }
+  };
+
   useEffect(() => {
     const init = async () => {
-      await Promise.all([fetchSites(), fetchStats(), fetchSystemMetrics(), fetchSystemHistory()]);
+      await Promise.all([fetchSettings(), fetchSites(), fetchStats(), fetchSystemMetrics(), fetchSystemHistory()]);
       setIsLoading(false);
     };
     init();
@@ -119,9 +129,16 @@ const App = () => {
   const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
   const toggleSettings = () => setSettingsOpen(!settingsOpen);
 
-  const handleCustomNameChange = (val) => {
+  const handleCustomNameChange = async (val) => {
     setCustomName(val);
-    localStorage.setItem('odyssey_custom_name', val);
+    try {
+      await axios.put('/api/settings', {
+        dashboard_name: val,
+        logo_url: customLogo
+      });
+    } catch (err) {
+      console.error('Error updating settings:', err);
+    }
   };
 
   const handleLogoUpload = async (e) => {
@@ -139,7 +156,8 @@ const App = () => {
       if (response.ok) {
         const data = await response.json();
         setCustomLogo(data.url);
-        localStorage.setItem('odyssey_custom_logo', data.url);
+        // Fetch latest settings from backend
+        await fetchSettings();
       }
     } catch (err) {
       console.error('Logo upload failed:', err);

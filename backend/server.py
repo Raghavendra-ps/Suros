@@ -76,6 +76,13 @@ class SiteSchema(SiteBase):
     class Config:
         from_attributes = True
 
+class SettingsSchema(BaseModel):
+    dashboard_name: str
+    logo_url: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
 import subprocess
 
 def check_site_status(url: str):
@@ -393,6 +400,15 @@ async def startup_event():
                 db.add(models.Site(**s))
             db.commit()
             logger.info(f"Seeded {len(default_sites)} sites.")
+        
+        # Initialize settings if they don't exist
+        if db.query(models.Settings).count() == 0:
+            logger.info("Initializing default settings...")
+            settings = models.Settings(dashboard_name="Odyssey", logo_url=None)
+            db.add(settings)
+            db.commit()
+            logger.info("Settings initialized.")
+        
         db.close()
         
         # Start tasks
@@ -632,7 +648,7 @@ def get_system_metrics():
         }
 
 @app.post("/api/upload-logo")
-async def upload_logo(file: UploadFile = File(...)):
+async def upload_logo(file: UploadFile = File(...), db: Session = Depends(get_db)):
     """Upload a logo file to the static folder"""
     allowed_types = {"image/png", "image/jpeg", "image/gif", "image/svg+xml", "image/webp"}
     if file.content_type not in allowed_types:
@@ -645,7 +661,18 @@ async def upload_logo(file: UploadFile = File(...)):
         content = await file.read()
         f.write(content)
     
-    return {"url": f"/static/{filename}", "filename": filename}
+    logo_url = f"/static/{filename}"
+    
+    # Update settings in database
+    settings = db.query(models.Settings).first()
+    if not settings:
+        settings = models.Settings(dashboard_name="Odyssey", logo_url=logo_url)
+        db.add(settings)
+    else:
+        settings.logo_url = logo_url
+    db.commit()
+    
+    return {"url": logo_url, "filename": filename}
 
 @app.get("/api/logo")
 def get_logo():
@@ -655,6 +682,34 @@ def get_logo():
     if logo_files:
         return {"url": f"/static/{logo_files[0]}"}
     return {"url": None}
+
+@app.get("/api/settings", response_model=SettingsSchema)
+def get_settings(db: Session = Depends(get_db)):
+    """Get dashboard settings (name and logo)"""
+    settings = db.query(models.Settings).first()
+    if not settings:
+        # Create default settings
+        settings = models.Settings(dashboard_name="Odyssey", logo_url=None)
+        db.add(settings)
+        db.commit()
+    return settings
+
+@app.put("/api/settings", response_model=SettingsSchema)
+def update_settings(settings_data: SettingsSchema, db: Session = Depends(get_db)):
+    """Update dashboard settings (name and logo)"""
+    settings = db.query(models.Settings).first()
+    if not settings:
+        settings = models.Settings(
+            dashboard_name=settings_data.dashboard_name,
+            logo_url=settings_data.logo_url
+        )
+        db.add(settings)
+    else:
+        settings.dashboard_name = settings_data.dashboard_name
+        if settings_data.logo_url is not None:
+            settings.logo_url = settings_data.logo_url
+    db.commit()
+    return settings
 
 @app.get("/health")
 def health_check():

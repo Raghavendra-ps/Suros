@@ -42,3 +42,9 @@ class OutageEvent(Base):
     outage_type = Column(String)  # 'network' | 'power'
     started_at = Column(DateTime)
     ended_at = Column(DateTime, nullable=True)  # null = ongoing
+
+class Settings(Base):
+    __tablename__ = "settings"
+    id = Column(Integer, primary_key=True, index=True)
+    dashboard_name = Column(String, default="Odyssey")
+    logo_url = Column(String, nullable=True)
