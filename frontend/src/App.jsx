@@ -781,10 +781,8 @@ const App = () => {
           </div>
 
           {/* Bento Card 16: Drives Monitoring */}
-          <div className="panel span-12" style={{ padding: '1.5rem' }}>
-            <div className="panel-header" style={{ borderBottom: 'none', padding: '0 0 1rem 0' }}>
-              <span className="panel-title" style={{ fontSize: '1.0rem', color: 'var(--text)' }}>Drives Monitoring</span>
-            </div>
+          <div className="panel bento-card span-12">
+            <div className="stat-label" style={{ marginBottom: '1.25rem' }}>Drives Monitoring</div>
             <div className="drives-grid">
               {drives.map((drive, idx) => (
                 <div key={idx} className={`drive-card ${drive.status.toLowerCase() === 'failed' ? 'failed' : ''}`}>

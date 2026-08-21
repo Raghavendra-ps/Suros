@@ -316,7 +316,7 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.9rem 1.25rem;
+  padding: 1.25rem 1.25rem 0.9rem 1.25rem;
   border-bottom: 1px solid var(--border);
 }
 .panel-title {
@@ -965,6 +965,21 @@ canvas { width: 100% !important; }
 .bento-grid > .dial-card {
   margin: 0 !important;
   height: 100%;
+  box-sizing: border-box;
+}
+
+.bento-grid > .stat-card,
+.bento-grid > .dial-card,
+.bento-grid > .bento-card {
+  padding: 1.25rem !important;
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 4px !important;
+}
+
+/* Override the summary row list-border rule inside Bento */
+.bento-grid > .stat-card + .stat-card {
+  border-left: 1px solid var(--border) !important;
 }
 
 @media (max-width: 1024px) {
