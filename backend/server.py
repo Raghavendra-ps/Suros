@@ -756,14 +756,32 @@ def get_system_history(db: Session = Depends(get_db)):
     history = db.query(models.SystemHistory).order_by(models.SystemHistory.timestamp.asc()).all()
     return history
 
+LAST_NET_IO = {"rx": 0, "tx": 0, "time": 0.0}
+
 @app.get("/api/system-metrics")
 def get_system_metrics():
+    global LAST_NET_IO
     try:
         # Get system metrics - use interval=None for non-blocking readings
         cpu_percent = psutil.cpu_percent(interval=None)
+        cpu_cores = psutil.cpu_percent(percpu=True)
         memory = psutil.virtual_memory()
         disk = psutil.disk_usage('/')
         gpu = get_gpu_metrics()
+        
+        # Calculate real-time network rates
+        net_io = psutil.net_io_counters()
+        now = time.time()
+        rx_rate = 0.0
+        tx_rate = 0.0
+        
+        if LAST_NET_IO["time"] > 0:
+            dt = now - LAST_NET_IO["time"]
+            if dt > 0:
+                rx_rate = max(0.0, (net_io.bytes_recv - LAST_NET_IO["rx"]) / dt)
+                tx_rate = max(0.0, (net_io.bytes_sent - LAST_NET_IO["tx"]) / dt)
+                
+        LAST_NET_IO = {"rx": net_io.bytes_recv, "tx": net_io.bytes_sent, "time": now}
         
         # Get all disk partitions - match lsblk format
         disks = []
@@ -836,7 +854,12 @@ def get_system_metrics():
                 "cpu": get_cpu_temp(),
                 "gpu": gpu['temp'] if gpu else None
             },
-            "uptime": round(time.time() - psutil.boot_time(), 0)
+            "uptime": round(time.time() - psutil.boot_time(), 0),
+            "cpu_cores": cpu_cores,
+            "network_rates": {
+                "rx": round(rx_rate, 2), # Bytes/sec
+                "tx": round(tx_rate, 2)  # Bytes/sec
+            }
         }
     except Exception as e:
         logger.error(f"Error fetching system metrics: {e}")
@@ -845,8 +868,33 @@ def get_system_metrics():
             "disk": {"percent": 0, "used": 0, "total": 0},
             "disks": [],
             "total_storage": {"total": 0, "used": 0, "free": 0, "percent": 0},
-            "gpu": None, "uptime": 0
+            "gpu": None, "uptime": 0, "cpu_cores": [], "network_rates": {"rx": 0.0, "tx": 0.0}
         }
+
+@app.get("/api/processes")
+def get_processes():
+    try:
+        processes = []
+        for proc in psutil.process_iter(['pid', 'name', 'username', 'cpu_percent', 'memory_info']):
+            try:
+                info = proc.info
+                mem_rss = info['memory_info'].rss if info['memory_info'] else 0
+                processes.append({
+                    "pid": info['pid'],
+                    "name": info['name'] or 'unknown',
+                    "user": info['username'] or 'root',
+                    "cpu": round(info['cpu_percent'] or 0.0, 1),
+                    "mem": round(mem_rss / (1024 * 1024), 1) # MB
+                })
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                pass
+        
+        # Sort by CPU descending
+        processes = sorted(processes, key=lambda x: x['cpu'], reverse=True)[:50]
+        return processes
+    except Exception as e:
+        logger.error(f"Error fetching processes: {e}")
+        return []
 
 @app.post("/api/upload-logo")
 async def upload_logo(file: UploadFile = File(...), db: Session = Depends(get_db)):

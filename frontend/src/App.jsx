@@ -34,6 +34,17 @@ const App = () => {
   const [systemMetrics, setSystemMetrics] = useState({ cpu: 0, memory: { percent: 0 }, disk: { percent: 0 }, total_storage: { total: 0, used: 0, free: 0, percent: 0 }, disks: [], uptime: 0, temp: { cpu: null, gpu: null } });
   const [systemHistory, setSystemHistory] = useState([]);
   const [drives, setDrives] = useState([]);
+  const [processes, setProcesses] = useState([]);
+  const [netHistory, setNetHistory] = useState([]);
+
+  const fetchProcesses = async () => {
+    try {
+      const res = await axios.get('/api/processes');
+      setProcesses(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error('Error fetching processes:', err);
+    }
+  };
 
   const fetchDrives = async () => {
     try {
@@ -109,6 +120,13 @@ const App = () => {
     try {
       const res = await axios.get('/api/system-metrics');
       setSystemMetrics(res.data);
+      if (res.data.network_rates) {
+        setNetHistory(prev => {
+          const next = [...prev, { rx: res.data.network_rates.rx, tx: res.data.network_rates.tx, time: new Date().toLocaleTimeString() }];
+          if (next.length > 30) next.shift();
+          return next;
+        });
+      }
     } catch (err) {
       console.error('Error fetching system metrics:', err);
     }
@@ -136,10 +154,14 @@ const App = () => {
 
   useEffect(() => {
     const init = async () => {
-      await Promise.all([fetchSettings(), fetchSites(), fetchStats(), fetchSystemMetrics(), fetchSystemHistory(), fetchDrives()]);
+      await Promise.all([fetchSettings(), fetchSites(), fetchStats(), fetchSystemMetrics(), fetchSystemHistory(), fetchDrives(), fetchProcesses()]);
       setIsLoading(false);
     };
     init();
+
+    const procInterval = setInterval(() => {
+      fetchProcesses();
+    }, 10000);
 
     const interval = setInterval(() => {
       fetchSites();
@@ -163,6 +185,7 @@ const App = () => {
       clearInterval(interval);
       clearInterval(metricsInterval);
       clearInterval(timeAgoInterval);
+      clearInterval(procInterval);
     };
   }, [lastCheckTime]);
 
@@ -679,7 +702,7 @@ const App = () => {
           {/* Bento Card 1: CPU Metrics */}
           <div className="panel bento-card span-3">
             <div className="stat-label">CPU Metrics</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text2)' }}>
                   <span>Usage</span>
@@ -699,6 +722,18 @@ const App = () => {
                   {systemMetrics.cpu > 80 ? 'High' : systemMetrics.cpu > 50 ? 'Moderate' : 'Low'}
                 </span>
               </div>
+              
+              {/* Percpu Cores Grid */}
+              {systemMetrics.cpu_cores && systemMetrics.cpu_cores.length > 0 && (
+                <div className="cpu-cores-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', marginTop: '4px', fontSize: '0.62rem', fontFamily: 'DM Mono', color: 'var(--text2)', borderTop: '1px dashed var(--border)', paddingTop: '6px' }}>
+                  {systemMetrics.cpu_cores.map((core, i) => (
+                    <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <span style={{ color: 'var(--text3)', fontSize: '0.55rem' }}>C{i}</span>
+                      <span style={{ color: core > 80 ? 'var(--down)' : 'var(--text)' }}>{Math.round(core)}%</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -829,15 +864,65 @@ const App = () => {
             </svg>
           </div>
 
-          {/* Bento Card 10: Network Health Dial */}
-          <div className="dial-card span-4">
-            <div className="dial-label">Network Health</div>
-            <svg className="dial-svg" width="180" height="120" viewBox="0 0 200 130">
-              <path d="M30,120 A70,70,0,0,1,170,120" fill="none" stroke="var(--surface3)" stroke-width="12" stroke-linecap="round" />
-              <path d="M30,120 A70,70,0,0,1,170,120" fill="none" stroke={stats.network_latency ? (stats.network_latency < 100 ? 'var(--up)' : 'var(--slow)') : 'var(--down)'} stroke-width="12" stroke-linecap="round" strokeDasharray={arc} style={getDialStyle(stats.network_latency ? Math.max(10, 100 - stats.network_latency / 5) : 0)} />
-              <text x="100" y="115" textAnchor="middle" fontFamily="Syne,sans-serif" fontSize="22" fontWeight="800" fill="var(--text)">{stats.network_latency ? `${stats.network_latency}ms` : 'OFFLINE'}</text>
-              <text x="100" y="130" textAnchor="middle" fontFamily="DM Moto,sans-serif" fontSize="8" fill="var(--text2)">1.1.1.1</text>
-            </svg>
+          {/* Bento Card 10: Network Throughput Graph */}
+          <div className="panel bento-card span-4" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div>
+              <div className="stat-label" style={{ marginBottom: '6px' }}>Network Throughput</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontFamily: 'DM Mono', marginTop: '4px' }}>
+                <span style={{ color: 'var(--up)' }}>▼ DN: {(() => {
+                  const bytes = systemMetrics.network_rates?.rx || 0;
+                  if (bytes === 0) return '0 B/s';
+                  const k = 1024;
+                  const sizes = ['B/s', 'KiB/s', 'MiB/s', 'GiB/s'];
+                  const i = Math.floor(Math.log(bytes) / Math.log(k));
+                  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+                })()}</span>
+                <span style={{ color: 'var(--down)' }}>▲ UP: {(() => {
+                  const bytes = systemMetrics.network_rates?.tx || 0;
+                  if (bytes === 0) return '0 B/s';
+                  const k = 1024;
+                  const sizes = ['B/s', 'KiB/s', 'MiB/s', 'GiB/s'];
+                  const i = Math.floor(Math.log(bytes) / Math.log(k));
+                  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+                })()}</span>
+              </div>
+            </div>
+            <div style={{ height: '70px', marginTop: '8px' }}>
+              <Line
+                data={{
+                  labels: netHistory.map(h => h.time),
+                  datasets: [
+                    {
+                      label: 'Download',
+                      data: netHistory.map(h => h.rx),
+                      borderColor: '#2fa87e',
+                      borderWidth: 1.5,
+                      pointRadius: 0,
+                      tension: 0.3,
+                      fill: false
+                    },
+                    {
+                      label: 'Upload',
+                      data: netHistory.map(h => h.tx),
+                      borderColor: '#c84b2f',
+                      borderWidth: 1.5,
+                      pointRadius: 0,
+                      tension: 0.3,
+                      fill: false
+                    }
+                  ]
+                }}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                  scales: {
+                    x: { display: false },
+                    y: { display: false }
+                  }
+                }}
+              />
+            </div>
           </div>
 
           {/* Bento Card 11: System Uptime Trend */}
@@ -960,7 +1045,7 @@ const App = () => {
           </div>
 
           {/* Bento Card 14: Memory Pressure Trend */}
-          <div className="panel span-6">
+          <div className="panel span-4">
             <div className="panel-header">
               <span className="panel-title">Memory Pressure</span>
               <span className="last-check-label">RAM trend</span>
@@ -974,13 +1059,44 @@ const App = () => {
           </div>
 
           {/* Bento Card 15: Server Connectivity History */}
-          <div className="panel span-6">
+          <div className="panel span-4">
             <div className="panel-header">
               <span className="panel-title">Server Connectivity</span>
               <span className="last-check-label">internet history</span>
             </div>
             <div className="chart-wrap" style={{ height: '180px' }}>
               <Line data={connectivityChartData} options={connectivityChartOptions} />
+            </div>
+          </div>
+
+          {/* Bento Card 15.5: Active Processes (BTOP Proc style) */}
+          <div className="panel span-4" style={{ display: 'flex', flexDirection: 'column', height: '248px' }}>
+            <div className="panel-header" style={{ padding: '1.25rem 1.25rem 0.5rem 1.25rem', borderBottom: 'none' }}>
+              <span className="panel-title">Active Processes</span>
+            </div>
+            <div className="proc-list-container" style={{ flex: 1, overflowY: 'auto', padding: '0 1.25rem 1.25rem 1.25rem', fontSize: '0.68rem', fontFamily: 'DM Mono' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', color: 'var(--text2)' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--text3)' }}>
+                    <th style={{ padding: '4px 0' }}>PID</th>
+                    <th>CMD</th>
+                    <th>USER</th>
+                    <th style={{ textAlign: 'right' }}>MEM</th>
+                    <th style={{ textAlign: 'right' }}>CPU</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {processes.map((proc, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid rgba(200,200,200,0.02)' }}>
+                      <td style={{ padding: '4px 0', color: 'var(--accent)' }}>{proc.pid}</td>
+                      <td style={{ maxWidth: '75px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={proc.name}>{proc.name}</td>
+                      <td>{proc.user}</td>
+                      <td style={{ textAlign: 'right' }}>{proc.mem}M</td>
+                      <td style={{ textAlign: 'right', color: proc.cpu > 20 ? 'var(--down)' : 'var(--up)' }}>{proc.cpu}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
 

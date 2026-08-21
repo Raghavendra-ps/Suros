@@ -1123,3 +1123,18 @@ canvas { width: 100% !important; }
     grid-column: span 1;
   }
 }
+
+/* ── Process List Scrollbar Styling ── */
+.proc-list-container::-webkit-scrollbar {
+  width: 4px;
+}
+.proc-list-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.proc-list-container::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+.proc-list-container::-webkit-scrollbar-thumb:hover {
+  background: var(--text3);
+}
