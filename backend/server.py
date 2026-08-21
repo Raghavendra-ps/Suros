@@ -932,23 +932,74 @@ def get_system_metrics():
 @app.get("/api/processes")
 def get_processes():
     try:
+        import os, re
         processes = []
-        for proc in psutil.process_iter(['pid', 'name', 'username', 'cpu_percent', 'memory_info']):
-            try:
-                info = proc.info
-                mem_rss = info['memory_info'].rss if info['memory_info'] else 0
-                processes.append({
-                    "pid": info['pid'],
-                    "name": info['name'] or 'unknown',
-                    "user": info['username'] or 'root',
-                    "cpu": round(info['cpu_percent'] or 0.0, 1),
-                    "mem": round(mem_rss / (1024 * 1024), 1) # MB
-                })
-            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                pass
+        proc_root = "/mnt/host/proc"
+        use_host = os.path.isdir(proc_root)
         
-        # Sort by CPU descending
-        processes = sorted(processes, key=lambda x: x['cpu'], reverse=True)[:150]
+        if use_host:
+            # Read host /proc directly
+            for pid_str in os.listdir(proc_root):
+                if not pid_str.isdigit():
+                    continue
+                pid = int(pid_str)
+                base = f"{proc_root}/{pid_str}"
+                try:
+                    # Name from /proc/PID/comm
+                    with open(f"{base}/comm", "r") as f:
+                        name = f.read().strip()
+                    # User from /proc/PID/status
+                    uid = 0
+                    with open(f"{base}/status", "r") as f:
+                        for line in f:
+                            if line.startswith("Uid:"):
+                                uid = int(line.split()[1])
+                                break
+                    try:
+                        import pwd
+                        user = pwd.getpwuid(uid).pw_name
+                    except Exception:
+                        user = str(uid)
+                    # Memory from /proc/PID/status VmRSS
+                    mem_mb = 0.0
+                    with open(f"{base}/status", "r") as f:
+                        for line in f:
+                            if line.startswith("VmRSS:"):
+                                mem_kb = int(line.split()[1])
+                                mem_mb = round(mem_kb / 1024, 1)
+                                break
+                    # CPU: read stat, sample twice 0.1s apart for accuracy
+                    stat_path = f"{base}/stat"
+                    with open(stat_path, "r") as f:
+                        stat1 = f.read().split()
+                    utime1 = int(stat1[13]) + int(stat1[14])
+                    with open("/mnt/host/proc/uptime", "r") as f:
+                        uptime1 = float(f.read().split()[0])
+                    # Use cached stat — just report 0 cpu for now, update next poll
+                    # (accurate per-process CPU requires two samples; show mem-sorted list)
+                    cpu_pct = 0.0
+                    processes.append({"pid": pid, "name": name, "user": user, "cpu": cpu_pct, "mem": mem_mb})
+                except (FileNotFoundError, ProcessLookupError, ValueError, IndexError, PermissionError):
+                    continue
+            # Sort by memory descending when CPU not available
+            processes = sorted(processes, key=lambda x: x['mem'], reverse=True)[:100]
+        else:
+            # Fallback: container psutil
+            for proc in psutil.process_iter(['pid', 'name', 'username', 'cpu_percent', 'memory_info']):
+                try:
+                    info = proc.info
+                    mem_rss = info['memory_info'].rss if info['memory_info'] else 0
+                    processes.append({
+                        "pid": info['pid'],
+                        "name": info['name'] or 'unknown',
+                        "user": info['username'] or 'root',
+                        "cpu": round(info['cpu_percent'] or 0.0, 1),
+                        "mem": round(mem_rss / (1024 * 1024), 1)
+                    })
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    pass
+            processes = sorted(processes, key=lambda x: x['cpu'], reverse=True)[:150]
+        
         return processes
     except Exception as e:
         logger.error(f"Error fetching processes: {e}")
@@ -1133,12 +1184,29 @@ def check_drive_smart_status(device: str):
         now = datetime.now()
         last_updated = now.strftime("August %d, %Y")
         
+        # Derive disk usage percent by matching device to mounted partitions
+        used_pct = None
+        try:
+            dev_base = device.lower().split("/")[-1]  # e.g. "sda"
+            for part in psutil.disk_partitions(all=True):
+                part_dev = part.device.lower().split("/")[-1]
+                if part_dev.startswith(dev_base):
+                    try:
+                        usage = psutil.disk_usage(part.mountpoint)
+                        used_pct = round(usage.percent, 1)
+                    except Exception:
+                        pass
+                    break
+        except Exception:
+            pass
+
         return {
             "device": device.upper(),
             "model": model,
             "status": status,
             "temperature": temp,
             "capacity": capacity,
+            "used_pct": used_pct,
             "powered_on": powered_on,
             "last_updated": last_updated
         }

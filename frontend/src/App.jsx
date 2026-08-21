@@ -1168,8 +1168,8 @@ const App = () => {
 
           {/* Right Column (span-4) containing Response Time and Active Processes */}
           <div className="span-4" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            {/* Response Time Trend (Shorter) */}
-            <div className="panel" style={{ margin: 0 }}>
+            {/* Response Time Trend — fixed height, never grows */}
+            <div className="panel" style={{ margin: 0, flexShrink: 0 }}>
               <div className="panel-header">
                 <span className="panel-title">Response Time Trend</span>
                 <span className="last-check-label">last 100 checks</span>
@@ -1179,8 +1179,8 @@ const App = () => {
               </div>
             </div>
 
-            {/* Active Processes (Fills the remaining height) */}
-            <div className="panel" style={{ display: 'flex', flexDirection: 'column', flex: 1, margin: 0, minHeight: '380px' }}>
+            {/* Active Processes — fixed height, scrollable inside */}
+            <div className="panel" style={{ margin: 0, height: '340px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
               <div className="panel-header" style={{ padding: '1.25rem 1.25rem 0.5rem 1.25rem', borderBottom: 'none' }}>
                 <span className="panel-title">Active Processes</span>
               </div>
@@ -1223,10 +1223,8 @@ const App = () => {
             <div className="drives-grid">
               {drives.map((drive, idx) => {
                 const isFailed = drive.status.toLowerCase() === 'failed';
-                // Parse capacity to get percentage if available
-                const capStr = drive.capacity || '';
-                const capMatch = capStr.match(/([\d.]+)/);
-                const capPct = capMatch ? Math.min(parseFloat(capMatch[1]), 100) : 0;
+                const usedPct = drive.used_pct ?? 0;
+                const diskColor = usedPct > 85 ? 'var(--down)' : usedPct > 75 ? 'var(--degraded)' : usedPct > 60 ? 'var(--lan)' : 'var(--up)';
                 return (
                   <div key={idx} className={`drive-card ${isFailed ? 'failed' : ''}`}>
                     <div className="drive-header-row">
@@ -1259,12 +1257,15 @@ const App = () => {
                           <span className="drive-metric-label">Capacity</span>
                           <div>
                             <span className="drive-metric-value">{drive.capacity}</span>
-                            <div className="drive-storage-bar">
-                              <div
-                                className="drive-storage-fill"
-                                style={{ width: `${capPct}%`, background: capPct > 80 ? 'var(--slow)' : 'var(--up)' }}
-                              />
-                            </div>
+                            {usedPct > 0 && (
+                              <div className="drive-storage-bar">
+                                <div
+                                  className="drive-storage-fill"
+                                  style={{ width: `${usedPct}%`, background: diskColor }}
+                                />
+                              </div>
+                            )}
+                            {usedPct > 0 && <span style={{ fontSize: '0.55rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>{usedPct}% used</span>}
                           </div>
                         </div>
                         <div className="drive-metric-col">
