@@ -852,10 +852,11 @@ def get_system_metrics():
 async def upload_logo(file: UploadFile = File(...), db: Session = Depends(get_db)):
     """Upload a logo file to the static folder"""
     allowed_types = {"image/png", "image/jpeg", "image/gif", "image/svg+xml", "image/webp"}
-    if file.content_type not in allowed_types:
-        raise HTTPException(status_code=400, detail="Invalid file type. Allowed: PNG, JPEG, GIF, SVG, WebP")
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in {'.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'}:
+        raise HTTPException(status_code=400, detail="Invalid file extension. Allowed: PNG, JPG, JPEG, GIF, SVG, WebP")
     
-    filename = f"logo{os.path.splitext(file.filename)[1]}"
+    filename = f"logo{ext}"
     filepath = os.path.join(STATIC_DIR, filename)
     
     with open(filepath, "wb") as f:
@@ -1148,7 +1149,7 @@ async def monitor_drives_task():
                     if result is not None:
                         new_drives.append(result)
                     else:
-                        old_entry = next((d for d in CACHED_DRIVES if d["device"] == dev_upper), None)
+                        old_entry = next((d for d in CACHED_DRIVES if d["device"].upper() == dev_upper), None)
                         if old_entry:
                             new_drives.append(old_entry)
             
