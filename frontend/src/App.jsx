@@ -76,6 +76,8 @@ const App = () => {
   });
   const [activeSettingsTab, setActiveSettingsTab] = useState('general');
   const [testStatus, setTestStatus] = useState(null);
+  const [draftSettings, setDraftSettings] = useState({});
+  const [saveStatus, setSaveStatus] = useState(null);
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
   const [renameDevice, setRenameDevice] = useState('');
   const [renameVal, setRenameVal] = useState('');
@@ -147,6 +149,7 @@ const App = () => {
       setCustomName(res.data.dashboard_name || 'Odyssey');
       setCustomLogo(res.data.logo_url || null);
       setSettings(res.data);
+      setDraftSettings(res.data);
     } catch (err) {
       console.error('Error fetching settings:', err);
     }
@@ -197,14 +200,34 @@ const App = () => {
   const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
   const toggleSettings = () => setSettingsOpen(!settingsOpen);
 
+  // Immediate save for toggle-type controls (checkboxes, selects)
   const handleSaveAlertSettings = async (updatedSettings) => {
     try {
       const res = await axios.put('/api/settings', updatedSettings);
       setSettings(res.data);
+      setDraftSettings(res.data);
       setCustomName(res.data.dashboard_name || 'Odyssey');
       setCustomLogo(res.data.logo_url || null);
     } catch (err) {
       console.error('Error updating settings:', err);
+    }
+  };
+
+  // Deferred save for text fields — called by Save button
+  const handleSaveDraft = async () => {
+    setSaveStatus('saving');
+    try {
+      const res = await axios.put('/api/settings', draftSettings);
+      setSettings(res.data);
+      setDraftSettings(res.data);
+      setCustomName(res.data.dashboard_name || 'Odyssey');
+      setCustomLogo(res.data.logo_url || null);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus(null), 2000);
+    } catch (err) {
+      console.error('Error updating settings:', err);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus(null), 3000);
     }
   };
 
@@ -514,8 +537,8 @@ const App = () => {
                   <label>Dashboard Name</label>
                   <input 
                     type="text" 
-                    value={settings.dashboard_name || ''} 
-                    onChange={(e) => handleSaveAlertSettings({ ...settings, dashboard_name: e.target.value })}
+                    value={draftSettings.dashboard_name || ''} 
+                    onChange={(e) => setDraftSettings({ ...draftSettings, dashboard_name: e.target.value })}
                     placeholder="e.g. Odyssey Dashboard" 
                   />
                 </div>
@@ -543,6 +566,12 @@ const App = () => {
                     </button>
                   </div>
                 </div>
+
+                <div className="settings-save-row">
+                  <button className="btn btn-accent" onClick={handleSaveDraft} disabled={saveStatus === 'saving'}>
+                    {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? '✓ Saved' : saveStatus === 'error' ? '✗ Error' : 'Save Changes'}
+                  </button>
+                </div>
               </div>
             )}
 
@@ -554,8 +583,8 @@ const App = () => {
                   <input 
                     type="checkbox" 
                     id="emailEnabledCheck"
-                    checked={settings.email_enabled === 1} 
-                    onChange={(e) => handleSaveAlertSettings({ ...settings, email_enabled: e.target.checked ? 1 : 0 })}
+                    checked={draftSettings.email_enabled === 1} 
+                    onChange={(e) => { const v = { ...draftSettings, email_enabled: e.target.checked ? 1 : 0 }; setDraftSettings(v); handleSaveAlertSettings(v); }}
                     style={{ width: 'auto', margin: 0, cursor: 'pointer' }}
                   />
                   <label htmlFor="emailEnabledCheck" style={{ margin: 0, cursor: 'pointer', textTransform: 'none' }}>Enable Email Alerts</label>
@@ -564,8 +593,8 @@ const App = () => {
                 <div className="form-group">
                   <label>Provider</label>
                   <select 
-                    value={settings.email_provider || 'gmail'} 
-                    onChange={(e) => handleSaveAlertSettings({ ...settings, email_provider: e.target.value })}
+                    value={draftSettings.email_provider || 'gmail'} 
+                    onChange={(e) => { const v = { ...draftSettings, email_provider: e.target.value }; setDraftSettings(v); handleSaveAlertSettings(v); }}
                   >
                     <option value="gmail">Gmail App Password</option>
                     <option value="microsoft">Microsoft (Outlook/Office365)</option>
@@ -574,13 +603,13 @@ const App = () => {
                   </select>
                 </div>
                 
-                {settings.email_provider === 'resend' ? (
+                {draftSettings.email_provider === 'resend' ? (
                   <div className="form-group">
                     <label>Resend API Key</label>
                     <input 
                       type="password" 
-                      value={settings.email_password || ''} 
-                      onChange={(e) => handleSaveAlertSettings({ ...settings, email_password: e.target.value })}
+                      value={draftSettings.email_password || ''} 
+                      onChange={(e) => setDraftSettings({ ...draftSettings, email_password: e.target.value })}
                       placeholder="re_..." 
                     />
                   </div>
@@ -590,8 +619,8 @@ const App = () => {
                       <label>SMTP Username / Email</label>
                       <input 
                         type="email" 
-                        value={settings.email_username || ''} 
-                        onChange={(e) => handleSaveAlertSettings({ ...settings, email_username: e.target.value })}
+                        value={draftSettings.email_username || ''} 
+                        onChange={(e) => setDraftSettings({ ...draftSettings, email_username: e.target.value })}
                         placeholder="your-email@provider.com" 
                       />
                     </div>
@@ -599,8 +628,8 @@ const App = () => {
                       <label>SMTP Password / App Password</label>
                       <input 
                         type="password" 
-                        value={settings.email_password || ''} 
-                        onChange={(e) => handleSaveAlertSettings({ ...settings, email_password: e.target.value })}
+                        value={draftSettings.email_password || ''} 
+                        onChange={(e) => setDraftSettings({ ...draftSettings, email_password: e.target.value })}
                         placeholder="••••••••••••••••" 
                       />
                     </div>
@@ -608,8 +637,8 @@ const App = () => {
                       <label>Custom SMTP Server (optional)</label>
                       <input 
                         type="text" 
-                        value={settings.email_smtp_server || ''} 
-                        onChange={(e) => handleSaveAlertSettings({ ...settings, email_smtp_server: e.target.value })}
+                        value={draftSettings.email_smtp_server || ''} 
+                        onChange={(e) => setDraftSettings({ ...draftSettings, email_smtp_server: e.target.value })}
                         placeholder="smtp.provider.com" 
                       />
                     </div>
@@ -617,8 +646,8 @@ const App = () => {
                       <label>SMTP Port (optional)</label>
                       <input 
                         type="number" 
-                        value={settings.email_smtp_port || 587} 
-                        onChange={(e) => handleSaveAlertSettings({ ...settings, email_smtp_port: parseInt(e.target.value) || 587 })}
+                        value={draftSettings.email_smtp_port || 587} 
+                        onChange={(e) => setDraftSettings({ ...draftSettings, email_smtp_port: parseInt(e.target.value) || 587 })}
                         placeholder="587" 
                       />
                     </div>
@@ -629,15 +658,20 @@ const App = () => {
                   <label>Recipient Address</label>
                   <input 
                     type="email" 
-                    value={settings.email_recipient || ''} 
-                    onChange={(e) => handleSaveAlertSettings({ ...settings, email_recipient: e.target.value })}
+                    value={draftSettings.email_recipient || ''} 
+                    onChange={(e) => setDraftSettings({ ...draftSettings, email_recipient: e.target.value })}
                     placeholder="notifications@recipient.com" 
                   />
                 </div>
                 
-                <button className="btn btn-accent" onClick={handleTestNotifications} style={{ marginTop: '1rem' }}>
-                  Test Connection
-                </button>
+                <div className="settings-save-row">
+                  <button className="btn btn-accent" onClick={handleSaveDraft} disabled={saveStatus === 'saving'}>
+                    {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? '✓ Saved' : saveStatus === 'error' ? '✗ Error' : 'Save Changes'}
+                  </button>
+                  <button className="btn" onClick={handleTestNotifications} style={{ marginLeft: '0.5rem' }}>
+                    Test Connection
+                  </button>
+                </div>
                 {testStatus && <div className="test-status-msg">{testStatus}</div>}
               </div>
             )}
@@ -650,8 +684,8 @@ const App = () => {
                   <input 
                     type="checkbox" 
                     id="ntfyEnabledCheck"
-                    checked={settings.ntfy_enabled === 1} 
-                    onChange={(e) => handleSaveAlertSettings({ ...settings, ntfy_enabled: e.target.checked ? 1 : 0 })}
+                    checked={draftSettings.ntfy_enabled === 1} 
+                    onChange={(e) => { const v = { ...draftSettings, ntfy_enabled: e.target.checked ? 1 : 0 }; setDraftSettings(v); handleSaveAlertSettings(v); }}
                     style={{ width: 'auto', margin: 0, cursor: 'pointer' }}
                   />
                   <label htmlFor="ntfyEnabledCheck" style={{ margin: 0, cursor: 'pointer', textTransform: 'none' }}>Enable ntfy Alerts</label>
@@ -661,8 +695,8 @@ const App = () => {
                   <label>ntfy Server URL</label>
                   <input 
                     type="text" 
-                    value={settings.ntfy_url || ''} 
-                    onChange={(e) => handleSaveAlertSettings({ ...settings, ntfy_url: e.target.value })}
+                    value={draftSettings.ntfy_url || ''} 
+                    onChange={(e) => setDraftSettings({ ...draftSettings, ntfy_url: e.target.value })}
                     placeholder="https://ntfy.sh" 
                   />
                 </div>
@@ -671,8 +705,8 @@ const App = () => {
                   <label>Topic</label>
                   <input 
                     type="text" 
-                    value={settings.ntfy_topic || ''} 
-                    onChange={(e) => handleSaveAlertSettings({ ...settings, ntfy_topic: e.target.value })}
+                    value={draftSettings.ntfy_topic || ''} 
+                    onChange={(e) => setDraftSettings({ ...draftSettings, ntfy_topic: e.target.value })}
                     placeholder="my-secret-topic" 
                   />
                 </div>
@@ -681,15 +715,20 @@ const App = () => {
                   <label>Access Token (optional)</label>
                   <input 
                     type="password" 
-                    value={settings.ntfy_token || ''} 
-                    onChange={(e) => handleSaveAlertSettings({ ...settings, ntfy_token: e.target.value })}
+                    value={draftSettings.ntfy_token || ''} 
+                    onChange={(e) => setDraftSettings({ ...draftSettings, ntfy_token: e.target.value })}
                     placeholder="tk_..." 
                   />
                 </div>
-                
-                <button className="btn btn-accent" onClick={handleTestNotifications} style={{ marginTop: '1rem' }}>
-                  Test Connection
-                </button>
+
+                <div className="settings-save-row">
+                  <button className="btn btn-accent" onClick={handleSaveDraft} disabled={saveStatus === 'saving'}>
+                    {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? '✓ Saved' : saveStatus === 'error' ? '✗ Error' : 'Save Changes'}
+                  </button>
+                  <button className="btn" onClick={handleTestNotifications} style={{ marginLeft: '0.5rem' }}>
+                    Test Connection
+                  </button>
+                </div>
                 {testStatus && <div className="test-status-msg">{testStatus}</div>}
               </div>
             )}

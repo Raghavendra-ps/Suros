@@ -1138,3 +1138,24 @@ canvas { width: 100% !important; }
 .proc-list-container::-webkit-scrollbar-thumb:hover {
   background: var(--text3);
 }
+
+/* ── Settings Save Row ── */
+.settings-save-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+.settings-save-row .btn {
+  padding: 8px 18px;
+  font-size: 0.85rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.settings-save-row .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
