@@ -888,8 +888,36 @@ def get_system_metrics():
         total_storage = sum(d["total"] for d in disks)
         used_storage = sum(d["used"] for d in disks)
         
+        # Get CPU Name
+        cpu_name = "Unknown CPU"
+        try:
+            paths = ["/mnt/host/proc/cpuinfo", "/proc/cpuinfo"]
+            import os
+            for path in paths:
+                if os.path.exists(path):
+                    with open(path, "r") as f:
+                        for line in f:
+                            if "model name" in line:
+                                cpu_name = line.split(":", 1)[1].strip()
+                                break
+                    if cpu_name != "Unknown CPU":
+                        break
+        except Exception:
+            pass
+
+        # Get GPU Name
+        gpu_name = None
+        if gpu:
+            try:
+                cmd = ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"]
+                gpu_name = subprocess.check_output(cmd, encoding='utf-8').strip()
+            except Exception:
+                gpu_name = "NVIDIA GPU"
+
         return {
             "cpu": cpu_percent,
+            "cpu_name": cpu_name,
+            "gpu_name": gpu_name,
             "memory": {
                 "percent": memory.percent,
                 "used": round(memory.used / (1024 ** 3), 2),

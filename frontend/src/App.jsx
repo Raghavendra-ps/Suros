@@ -753,12 +753,15 @@ const App = () => {
           
           {/* Bento Card 1: CPU Metrics (Full Length) */}
           <div className="panel bento-card span-12">
-            <div className="stat-label" style={{ marginBottom: '10px' }}>CPU Metrics</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr 2fr', gap: '1.5rem', alignItems: 'center' }}>
+            <div className="stat-label" style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>CPU Metrics</span>
+              <span style={{ fontSize: '0.65rem', color: 'var(--text2)', fontFamily: 'DM Mono' }}>{systemMetrics.cpu_name || 'Detecting CPU...'}</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '160px 1.2fr 3.8fr', gap: '2rem', alignItems: 'center' }}>
 
               {/* Gauge */}
               <div className="cpu-gauge-wrap">
-                <svg className="cpu-gauge-svg" viewBox="0 0 200 115" width="160" height="92">
+                <svg className="cpu-gauge-svg" viewBox="0 0 200 115" width="150" height="86">
                   <path d="M 22,108 A 78,78 0 0 1 178,108" fill="none" stroke="var(--surface3)" strokeWidth="13" strokeLinecap="round"/>
                   <path
                     d="M 22,108 A 78,78 0 0 1 178,108"
@@ -777,10 +780,10 @@ const App = () => {
               </div>
 
               {/* Stats column */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', justifyContent: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', justifyContent: 'center' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>Temperature</span>
-                  <span className="stat-value" style={{ fontSize: '1.3rem', fontWeight: '700' }}>
+                  <span className="stat-value" style={{ fontSize: '1.2rem', fontWeight: '700' }}>
                     {systemMetrics.temp?.cpu ? `${Math.round(systemMetrics.temp.cpu)}°C` : 'N/A'}
                   </span>
                 </div>
@@ -792,17 +795,17 @@ const App = () => {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>Cores</span>
-                  <span style={{ fontSize: '0.8rem', fontFamily: 'DM Mono', color: 'var(--text2)' }}>
-                    {systemMetrics.cpu_cores?.length || 'N/A'}
+                  <span style={{ fontSize: '0.8rem', fontFamily: 'DM Mono', color: 'var(--text2)', fontWeight: '600' }}>
+                    {systemMetrics.cpu_cores ? `${systemMetrics.cpu_cores.length / 2}C / ${systemMetrics.cpu_cores.length}T` : '6C / 12T'}
                   </span>
                 </div>
               </div>
 
               {/* Core Heatmap Bars */}
-              <div>
+              <div style={{ width: '100%' }}>
                 <span style={{ fontSize: '0.6rem', color: 'var(--text3)', fontFamily: 'DM Mono', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: '6px' }}>Core Utilization</span>
                 {systemMetrics.cpu_cores && systemMetrics.cpu_cores.length > 0 ? (
-                  <div className="core-bar-grid">
+                  <div className="core-bar-grid" style={{ width: '100%' }}>
                     {systemMetrics.cpu_cores.map((core, i) => (
                       <div key={i} className="core-bar-item" title={`Core ${i}: ${Math.round(core)}%`}>
                         <div className="core-bar-track">
@@ -853,7 +856,10 @@ const App = () => {
 
           {/* Bento Card 3: GPU Metrics */}
           <div className="panel bento-card span-4" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div className="stat-label">GPU Metrics</div>
+            <div className="stat-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>GPU Metrics</span>
+              {systemMetrics.gpu_name && <span style={{ fontSize: '0.58rem', color: 'var(--text2)', fontFamily: 'DM Mono' }}>{systemMetrics.gpu_name}</span>}
+            </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', margin: '8px 0 2px' }}>
               <span className="stat-value" style={{ fontSize: '1.8rem', fontWeight: '800' }}>{systemMetrics.gpu ? `${Math.round(systemMetrics.gpu.util)}%` : 'N/A'}</span>
               <span style={{ fontSize: '0.7rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>{systemMetrics.temp?.gpu ? `${Math.round(systemMetrics.temp.gpu)}°C` : 'Temp N/A'}</span>
