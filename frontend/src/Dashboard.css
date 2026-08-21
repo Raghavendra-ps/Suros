@@ -1269,10 +1269,8 @@ header {
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  /* flexible width: min 10px, grows to fill, so 16 cores fit in one row */
   flex: 1 1 10px;
   min-width: 10px;
-  max-width: 28px;
   height: 72px;
 }
 .core-bar-track {
