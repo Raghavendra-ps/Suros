@@ -1159,3 +1159,201 @@ canvas { width: 100% !important; }
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ═══════════════════════════════════════
+   VISUAL UPGRADES v2
+   ═══════════════════════════════════════ */
+
+/* ── Glassmorphism Header ── */
+:root[data-theme="dark"]  { --bg-glass: rgba(15, 14, 13, 0.88); }
+:root[data-theme="light"] { --bg-glass: rgba(250, 248, 244, 0.88); }
+
+header {
+  background: var(--bg-glass) !important;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-bottom-color: var(--border) !important;
+}
+
+/* ── Staggered Card Entry Animation ── */
+@keyframes cardEnter {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.bento-grid > * { animation: cardEnter 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.bento-grid > *:nth-child(1)  { animation-delay: 0.03s; }
+.bento-grid > *:nth-child(2)  { animation-delay: 0.08s; }
+.bento-grid > *:nth-child(3)  { animation-delay: 0.13s; }
+.bento-grid > *:nth-child(4)  { animation-delay: 0.18s; }
+.bento-grid > *:nth-child(5)  { animation-delay: 0.23s; }
+.bento-grid > *:nth-child(6)  { animation-delay: 0.28s; }
+.bento-grid > *:nth-child(7)  { animation-delay: 0.33s; }
+.bento-grid > *:nth-child(8)  { animation-delay: 0.38s; }
+.bento-grid > *:nth-child(9)  { animation-delay: 0.43s; }
+.bento-grid > *:nth-child(10) { animation-delay: 0.48s; }
+.bento-grid > *:nth-child(11) { animation-delay: 0.53s; }
+.bento-grid > *:nth-child(12) { animation-delay: 0.58s; }
+
+/* ── Pulse Ring on Online Dots ── */
+@keyframes pulseRing {
+  0%   { box-shadow: 0 0 0 0   rgba(47, 168, 126, 0.55); }
+  70%  { box-shadow: 0 0 0 7px rgba(47, 168, 126, 0);    }
+  100% { box-shadow: 0 0 0 0   rgba(47, 168, 126, 0);    }
+}
+.status-dot.online { animation: pulseRing 2.4s ease-in-out infinite; }
+
+/* ── Stat Card Accent Strips ── */
+.stat-card { overflow: hidden; }
+.stat-card.up::before,
+.stat-card.down::before,
+.stat-card.warn::before,
+.stat-card.neutral::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 18px; bottom: 18px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+}
+.stat-card.up::before      { background: var(--up);       box-shadow: 0 0 10px rgba(47,168,126,0.45); }
+.stat-card.down::before    { background: var(--down);     box-shadow: 0 0 10px rgba(200,75,47,0.45); }
+.stat-card.warn::before    { background: var(--degraded); box-shadow: 0 0 10px rgba(224,140,47,0.35); }
+.stat-card.neutral::before { background: var(--text3); }
+
+/* Trend arrow next to stat value */
+.stat-trend {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.75rem;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.stat-trend.up   { color: var(--up); }
+.stat-trend.down { color: var(--down); }
+
+/* ── CPU Arc Gauge ── */
+.cpu-gauge-svg path { transition: stroke-dashoffset 0.7s cubic-bezier(0.4,0,0.2,1), stroke 0.4s; }
+.cpu-gauge-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.cpu-gauge-sub {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text3);
+  margin-top: -4px;
+}
+
+/* ── Core Heatmap Bar Grid ── */
+.core-bar-grid {
+  display: flex;
+  gap: 3px;
+  align-items: flex-end;
+  height: 72px;
+  padding-top: 4px;
+}
+.core-bar-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+.core-bar-track {
+  width: 100%;
+  flex: 1;
+  background: var(--surface3);
+  border-radius: 2px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+.core-bar-fill {
+  width: 100%;
+  border-radius: 2px 2px 0 0;
+  transition: height 0.65s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s;
+  min-height: 2px;
+}
+.core-bar-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.46rem;
+  color: var(--text3);
+}
+
+/* ── Sparkline Container ── */
+.sparkline-wrap {
+  height: 44px;
+  margin-top: 10px;
+}
+
+/* ── Site History Dot Strip ── */
+.site-history-dots {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  margin-top: 3px;
+}
+.history-dot {
+  width: 5px;
+  height: 10px;
+  border-radius: 1px;
+  flex-shrink: 0;
+  transition: opacity 0.2s;
+}
+.history-dot.dot-up      { background: var(--up); }
+.history-dot.dot-slow    { background: var(--degraded); }
+.history-dot.dot-down    { background: var(--down); opacity: 0.75; }
+.history-dot.dot-unknown { background: var(--surface3); }
+
+/* ── Process CPU Mini-bar ── */
+.proc-cpu-cell { position: relative; }
+.proc-cpu-bar {
+  position: absolute;
+  right: 0; top: 1px; bottom: 1px;
+  opacity: 0.13;
+  border-radius: 1px;
+  transition: width 0.4s ease;
+  pointer-events: none;
+}
+
+/* ── Drive Card Improvements ── */
+.drive-smart-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 2px 9px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+.drive-smart-pill.ok {
+  background: rgba(47,168,126,0.1);
+  color: var(--up);
+  border: 1px solid rgba(47,168,126,0.22);
+  box-shadow: 0 0 10px rgba(47,168,126,0.18);
+}
+.drive-smart-pill.failed {
+  background: rgba(200,75,47,0.1);
+  color: var(--down);
+  border: 1px solid rgba(200,75,47,0.22);
+  box-shadow: 0 0 10px rgba(200,75,47,0.22);
+}
+.drive-storage-bar {
+  height: 4px;
+  background: var(--surface3);
+  border-radius: 3px;
+  margin: 6px 0 2px;
+  overflow: hidden;
+}
+.drive-storage-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.7s cubic-bezier(0.4,0,0.2,1);
+}
