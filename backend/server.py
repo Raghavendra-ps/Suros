@@ -29,9 +29,40 @@ logging.basicConfig(
 )
 logger = logging.getLogger("odyssey-backend")
 
-# Create database tables
 try:
     models.Base.metadata.create_all(bind=engine)
+    
+    # Run SQLite migration checks to automatically add missing settings columns
+    import sqlite3
+    try:
+        conn = sqlite3.connect("./uptime.db")
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(settings)")
+        existing_cols = [row[1] for row in cursor.fetchall()]
+        
+        new_columns = [
+            ("email_enabled", "INTEGER DEFAULT 0"),
+            ("email_provider", "VARCHAR DEFAULT 'gmail'"),
+            ("email_smtp_server", "VARCHAR"),
+            ("email_smtp_port", "INTEGER DEFAULT 587"),
+            ("email_username", "VARCHAR"),
+            ("email_password", "VARCHAR"),
+            ("email_recipient", "VARCHAR"),
+            ("ntfy_enabled", "INTEGER DEFAULT 0"),
+            ("ntfy_url", "VARCHAR DEFAULT 'https://ntfy.sh'"),
+            ("ntfy_topic", "VARCHAR"),
+            ("ntfy_token", "VARCHAR")
+        ]
+        
+        for col_name, col_type in new_columns:
+            if col_name not in existing_cols:
+                logger.info(f"Migration: Adding column {col_name} to settings table")
+                cursor.execute(f"ALTER TABLE settings ADD COLUMN {col_name} {col_type}")
+        
+        conn.commit()
+        conn.close()
+    except Exception as em:
+        logger.error(f"Migration failed: {em}")
 except Exception as e:
     logger.error(f"Database creation error: {e}")
 
