@@ -1082,17 +1082,17 @@ canvas { width: 100% !important; }
 .span-12 { grid-column: span 12; }
 
 /* Ensure card panel components inside grid stretch nicely */
-.bento-grid > .panel,
-.bento-grid > .stat-card,
-.bento-grid > .dial-card {
+.bento-grid .panel,
+.bento-grid .stat-card,
+.bento-grid .dial-card {
   margin: 0 !important;
   height: 100%;
   box-sizing: border-box;
 }
 
-.bento-grid > .stat-card,
-.bento-grid > .dial-card,
-.bento-grid > .bento-card {
+.bento-grid .stat-card,
+.bento-grid .dial-card,
+.bento-grid .bento-card {
   padding: 1.25rem !important;
   background: var(--surface) !important;
   border: 1px solid var(--border) !important;
@@ -1100,7 +1100,7 @@ canvas { width: 100% !important; }
 }
 
 /* Override the summary row list-border rule inside Bento */
-.bento-grid > .stat-card + .stat-card {
+.bento-grid .stat-card + .stat-card {
   border-left: 1px solid var(--border) !important;
 }
 

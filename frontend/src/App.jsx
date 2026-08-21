@@ -550,15 +550,15 @@ const App = () => {
               <div className="settings-section-fields">
                 <h3>Email Outage Alerts</h3>
                 
-                <div className="form-group">
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={settings.email_enabled === 1} 
-                      onChange={(e) => handleSaveAlertSettings({ ...settings, email_enabled: e.target.checked ? 1 : 0 })}
-                    />
-                    Enable Email Alerts
-                  </label>
+                <div className="form-group checkbox-group" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input 
+                    type="checkbox" 
+                    id="emailEnabledCheck"
+                    checked={settings.email_enabled === 1} 
+                    onChange={(e) => handleSaveAlertSettings({ ...settings, email_enabled: e.target.checked ? 1 : 0 })}
+                    style={{ width: 'auto', margin: 0, cursor: 'pointer' }}
+                  />
+                  <label htmlFor="emailEnabledCheck" style={{ margin: 0, cursor: 'pointer', textTransform: 'none' }}>Enable Email Alerts</label>
                 </div>
                 
                 <div className="form-group">
@@ -646,15 +646,15 @@ const App = () => {
               <div className="settings-section-fields">
                 <h3>ntfy Push Alerts</h3>
                 
-                <div className="form-group">
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={settings.ntfy_enabled === 1} 
-                      onChange={(e) => handleSaveAlertSettings({ ...settings, ntfy_enabled: e.target.checked ? 1 : 0 })}
-                    />
-                    Enable ntfy Alerts
-                  </label>
+                <div className="form-group checkbox-group" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input 
+                    type="checkbox" 
+                    id="ntfyEnabledCheck"
+                    checked={settings.ntfy_enabled === 1} 
+                    onChange={(e) => handleSaveAlertSettings({ ...settings, ntfy_enabled: e.target.checked ? 1 : 0 })}
+                    style={{ width: 'auto', margin: 0, cursor: 'pointer' }}
+                  />
+                  <label htmlFor="ntfyEnabledCheck" style={{ margin: 0, cursor: 'pointer', textTransform: 'none' }}>Enable ntfy Alerts</label>
                 </div>
                 
                 <div className="form-group">
@@ -699,122 +699,98 @@ const App = () => {
       <div className="main">
         <div className="bento-grid">
           
-          {/* Bento Card 1: CPU Metrics */}
-          <div className="panel bento-card span-3">
-            <div className="stat-label">CPU Metrics</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text2)' }}>
-                  <span>Usage</span>
-                  <span>{Math.round(systemMetrics.cpu)}%</span>
+          {/* Bento Card 1: CPU Metrics (Full Length) */}
+          <div className="panel bento-card span-12">
+            <div className="stat-label" style={{ marginBottom: '10px' }}>CPU Metrics</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
+              {/* Left Side: General stats */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', justifyContent: 'center' }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text2)' }}>
+                    <span>Usage</span>
+                    <span>{Math.round(systemMetrics.cpu)}%</span>
+                  </div>
+                  <div className="latency-bar" style={{ height: '6px', margin: '4px 0' }}>
+                    <div className="latency-fill" style={{ width: `${Math.round(systemMetrics.cpu)}%`, background: systemMetrics.cpu > 80 ? 'var(--down)' : 'var(--up)' }}></div>
+                  </div>
                 </div>
-                <div className="latency-bar" style={{ height: '6px', margin: '4px 0' }}>
-                  <div className="latency-fill" style={{ width: `${Math.round(systemMetrics.cpu)}%`, background: systemMetrics.cpu > 80 ? 'var(--down)' : 'var(--up)' }}></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text2)' }}>Temperature</span>
+                  <span className="stat-value" style={{ fontSize: '1.25rem', fontWeight: '700' }}>{systemMetrics.temp?.cpu ? `${Math.round(systemMetrics.temp.cpu)}°C` : 'N/A'}</span>
                 </div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text2)' }}>Temperature</span>
-                <span className="stat-value" style={{ fontSize: '1.1rem' }}>{systemMetrics.temp?.cpu ? `${Math.round(systemMetrics.temp.cpu)}°C` : 'N/A'}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text3)' }}>Pressure</span>
-                <span className={`badge ${systemMetrics.cpu > 80 ? 'offline' : systemMetrics.cpu > 50 ? 'degraded' : 'online'}`} style={{ fontSize: '0.6rem', padding: '2px 6px' }}>
-                  {systemMetrics.cpu > 80 ? 'High' : systemMetrics.cpu > 50 ? 'Moderate' : 'Low'}
-                </span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text3)' }}>Pressure</span>
+                  <span className={`badge ${systemMetrics.cpu > 80 ? 'offline' : systemMetrics.cpu > 50 ? 'degraded' : 'online'}`} style={{ fontSize: '0.65rem', padding: '2px 8px' }}>
+                    {systemMetrics.cpu > 80 ? 'High' : systemMetrics.cpu > 50 ? 'Moderate' : 'Low'}
+                  </span>
+                </div>
               </div>
               
-              {/* Percpu Cores Grid */}
-              {systemMetrics.cpu_cores && systemMetrics.cpu_cores.length > 0 && (
-                <div className="cpu-cores-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', marginTop: '4px', fontSize: '0.62rem', fontFamily: 'DM Mono', color: 'var(--text2)', borderTop: '1px dashed var(--border)', paddingTop: '6px' }}>
-                  {systemMetrics.cpu_cores.map((core, i) => (
-                    <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <span style={{ color: 'var(--text3)', fontSize: '0.55rem' }}>C{i}</span>
-                      <span style={{ color: core > 80 ? 'var(--down)' : 'var(--text)' }}>{Math.round(core)}%</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {/* Right Side: Percpu Cores Grid */}
+              <div>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text3)', fontFamily: 'DM Mono', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Core Utilization</span>
+                {systemMetrics.cpu_cores && systemMetrics.cpu_cores.length > 0 && (
+                  <div className="cpu-cores-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px', fontSize: '0.62rem', fontFamily: 'DM Mono', color: 'var(--text2)' }}>
+                    {systemMetrics.cpu_cores.map((core, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', background: 'var(--surface2)', padding: '4px 6px', borderRadius: '3px', border: '1px solid var(--border)' }}>
+                        <span style={{ color: 'var(--text3)', fontSize: '0.55rem' }}>C{i}</span>
+                        <span style={{ color: core > 80 ? 'var(--down)' : 'var(--text)' }}>{Math.round(core)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Bento Card 2: RAM Metrics */}
-          <div className="panel bento-card span-3">
+          {/* Bento Card 2: RAM Metrics (Shortened) */}
+          <div className="panel bento-card span-4" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div className="stat-label">RAM Metrics</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text2)' }}>
-                  <span>Usage</span>
-                  <span>{Math.round(systemMetrics.memory.percent)}%</span>
-                </div>
-                <div className="latency-bar" style={{ height: '6px', margin: '4px 0' }}>
-                  <div className="latency-fill" style={{ width: `${Math.round(systemMetrics.memory.percent)}%`, background: systemMetrics.memory.percent > 80 ? 'var(--down)' : 'var(--up)' }}></div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text2)' }}>Details</span>
-                <span style={{ fontSize: '0.8rem', fontFamily: 'DM Mono', color: 'var(--text2)' }}>
-                  {systemMetrics.memory.used} / {systemMetrics.memory.total} GB
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text3)' }}>Pressure</span>
-                <span className={`badge ${systemMetrics.memory.percent > 80 ? 'offline' : systemMetrics.memory.percent > 60 ? 'degraded' : 'online'}`} style={{ fontSize: '0.6rem', padding: '2px 6px' }}>
-                  {systemMetrics.memory.percent > 80 ? 'High' : systemMetrics.memory.percent > 60 ? 'Moderate' : 'Low'}
-                </span>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', margin: '8px 0' }}>
+              <span className="stat-value" style={{ fontSize: '1.8rem', fontWeight: '800' }}>{Math.round(systemMetrics.memory.percent)}%</span>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>{systemMetrics.memory.used} / {systemMetrics.memory.total} GB</span>
+            </div>
+            <div className="latency-bar" style={{ height: '6px', margin: '4px 0' }}>
+              <div className="latency-fill" style={{ width: `${Math.round(systemMetrics.memory.percent)}%`, background: systemMetrics.memory.percent > 80 ? 'var(--down)' : 'var(--up)' }}></div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--text3)', marginTop: '4px' }}>
+              <span>Pressure</span>
+              <span className={`badge ${systemMetrics.memory.percent > 85 ? 'offline' : 'online'}`}>{systemMetrics.memory.percent > 85 ? 'High' : 'Low'}</span>
             </div>
           </div>
 
-          {/* Bento Card 3: GPU Metrics */}
-          <div className="panel bento-card span-3">
+          {/* Bento Card 3: GPU Metrics (Shortened) */}
+          <div className="panel bento-card span-4" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div className="stat-label">GPU Metrics</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text2)' }}>
-                  <span>Usage</span>
-                  <span>{systemMetrics.gpu ? `${Math.round(systemMetrics.gpu.util)}%` : 'N/A'}</span>
-                </div>
-                <div className="latency-bar" style={{ height: '6px', margin: '4px 0' }}>
-                  <div className="latency-fill" style={{ width: `${Math.round(systemMetrics.gpu?.util || 0)}%`, background: (systemMetrics.gpu?.util || 0) > 80 ? 'var(--down)' : 'var(--up)' }}></div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text2)' }}>Temperature</span>
-                <span className="stat-value" style={{ fontSize: '1.1rem' }}>{systemMetrics.temp?.gpu ? `${Math.round(systemMetrics.temp.gpu)}°C` : 'N/A'}</span>
-              </div>
-              {systemMetrics.gpu && (
-                <div style={{ fontSize: '0.65rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>
-                  VRAM: {systemMetrics.gpu.memory.used}/{systemMetrics.gpu.memory.total} GB
-                </div>
-              )}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', margin: '8px 0' }}>
+              <span className="stat-value" style={{ fontSize: '1.8rem', fontWeight: '800' }}>{systemMetrics.gpu ? `${Math.round(systemMetrics.gpu.util)}%` : 'N/A'}</span>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>{systemMetrics.temp?.gpu ? `${Math.round(systemMetrics.temp.gpu)}°C` : 'Temp N/A'}</span>
             </div>
+            <div className="latency-bar" style={{ height: '6px', margin: '4px 0' }}>
+              <div className="latency-fill" style={{ width: `${Math.round(systemMetrics.gpu?.util || 0)}%`, background: (systemMetrics.gpu?.util || 0) > 80 ? 'var(--down)' : 'var(--up)' }}></div>
+            </div>
+            {systemMetrics.gpu ? (
+              <div style={{ fontSize: '0.65rem', color: 'var(--text3)', fontFamily: 'DM Mono', marginTop: '4px' }}>
+                VRAM: {systemMetrics.gpu.memory.used}/{systemMetrics.gpu.memory.total} GB
+              </div>
+            ) : (
+              <div style={{ fontSize: '0.65rem', color: 'var(--text3)', marginTop: '4px' }}>No GPU detected</div>
+            )}
           </div>
 
-          {/* Bento Card 4: Storage */}
-          <div className="panel bento-card span-3">
+          {/* Bento Card 4: Storage (Shortened) */}
+          <div className="panel bento-card span-4" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div className="stat-label">Storage</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text2)' }}>
-                  <span>Capacity</span>
-                  <span>{systemMetrics.total_storage?.percent || 0}%</span>
-                </div>
-                <div className="latency-bar" style={{ height: '6px', margin: '4px 0' }}>
-                  <div className="storage-bar" style={{ width: `${systemMetrics.total_storage?.percent || 0}%`, height: '100%', backgroundColor: systemMetrics.total_storage?.percent < 80 ? 'var(--up)' : systemMetrics.total_storage?.percent < 90 ? 'var(--slow)' : 'var(--down)' }}></div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text2)' }}>Details</span>
-                <span style={{ fontSize: '0.8rem', fontFamily: 'DM Mono', color: 'var(--text2)' }}>
-                  {systemMetrics.total_storage?.used || 0} / {systemMetrics.total_storage?.total || 0} GB
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text3)' }}>Free</span>
-                <span style={{ fontSize: '0.8rem', fontFamily: 'DM Mono', color: 'var(--text2)' }}>
-                  {systemMetrics.total_storage?.free || 0} GB
-                </span>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', margin: '8px 0' }}>
+              <span className="stat-value" style={{ fontSize: '1.8rem', fontWeight: '800' }}>{systemMetrics.total_storage?.percent || 0}%</span>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>{systemMetrics.total_storage?.used || 0} / {systemMetrics.total_storage?.total || 0} GB</span>
+            </div>
+            <div className="latency-bar" style={{ height: '6px', margin: '4px 0' }}>
+              <div className="storage-bar" style={{ width: `${systemMetrics.total_storage?.percent || 0}%`, height: '100%', backgroundColor: systemMetrics.total_storage?.percent < 80 ? 'var(--up)' : 'var(--slow)' }}></div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--text3)', marginTop: '4px' }}>
+              <span>Free Space</span>
+              <span style={{ fontFamily: 'DM Mono' }}>{systemMetrics.total_storage?.free || 0} GB</span>
             </div>
           </div>
 
@@ -840,16 +816,16 @@ const App = () => {
           </div>
 
           {/* Bento Card 8: Server Outages */}
-          <div className="stat-card neutral span-3">
-            <div className="outage-wrap">
+          <div className="stat-card neutral span-3" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div>
               <div className="stat-label">Server Outages</div>
-              <div className="stat-value">{(stats.network_outages || 0) + (stats.power_outages || 0)}</div>
-              <div className="stat-sub">internet / power</div>
-              <div className="outage-tooltip">
-                <div>Network outages: {stats.network_outages || 0}</div>
-                <div>Power outages: {stats.power_outages || 0}</div>
-                {stats.current_outage && <div style={{ color: 'var(--down)' }}>Currently offline!</div>}
+              <div className="stat-value" style={{ fontSize: '1.8rem', fontWeight: '800' }}>
+                {(stats.network_outages || 0) + (stats.power_outages || 0)}
               </div>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', fontSize: '0.65rem', color: 'var(--text3)', fontFamily: 'DM Mono', borderTop: '1px dashed var(--border)', paddingTop: '6px', marginTop: '6px' }}>
+              <span>Network: {stats.network_outages || 0}</span>
+              <span>Power: {stats.power_outages || 0}</span>
             </div>
           </div>
 
@@ -955,148 +931,157 @@ const App = () => {
             </div>
           </div>
 
-          {/* Bento Card 12: Monitored Sites List */}
-          <div className="panel span-8">
-            <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span className="panel-title">Monitored Sites</span>
-                <span className="last-check-label">{sites.length} sites</span>
+          {/* Bottom Bento Section: Left Column (span-8) + Right Column (span-4) */}
+          <div className="span-8" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            {/* Monitored Sites List */}
+            <div className="panel" style={{ margin: 0 }}>
+              <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span className="panel-title">Monitored Sites</span>
+                  <span className="last-check-label">{sites.length} sites</span>
+                </div>
+                <button 
+                  className="btn btn-accent" 
+                  onClick={() => { 
+                    setEditingSite(null); 
+                    setNewSite({ name: '', url: '', icon: '' }); 
+                    setIsModalOpen(true); 
+                  }} 
+                  style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+                >
+                  + Add Site
+                </button>
               </div>
-              <button 
-                className="btn btn-accent" 
-                onClick={() => { 
-                  setEditingSite(null); 
-                  setNewSite({ name: '', url: '', icon: '' }); 
-                  setIsModalOpen(true); 
-                }} 
-                style={{ padding: '4px 10px', fontSize: '0.75rem' }}
-              >
-                + Add Site
-              </button>
-            </div>
-            <div className="col-headers">
-              <div></div>
-              <div className="col-h">Site</div>
-              <div className="col-h">Status</div>
-              <div className="col-h">Ping</div>
-              <div className="col-h">Latency</div>
-              <div className="col-h" style={{ textAlign: 'right' }}>Outages</div>
-              <div></div>
-            </div>
-            <div id="siteList">
-              {safeSites.length === 0 ? (
-                <div className="empty-state">No sites added yet — add sites to begin.</div>
-              ) : (
-                safeSites.map(site => site && (
-                  <div key={site.id} className="site-row clickable" onClick={() => site.url && window.open(site.url, '_blank')}>
-                    <div className={`status-dot ${site.status === 'success' ? 'online' : site.status === 'lan_up' ? 'lan' : site.status === 'slow' ? 'degraded' : 'offline'}`} title={site.status === 'lan_up' ? 'Reachable via LAN' : site.status === 'slow' ? 'Degraded' : site.status === 'success' ? 'Online' : 'Offline'}></div>
-                    <div>
-                      <div className="site-name">
-                        <Icon name={site.icon} size={18} style={{ marginRight: '8px', color: 'var(--text2)' }} />
-                        {site.name}
+              <div className="col-headers">
+                <div></div>
+                <div className="col-h">Site</div>
+                <div className="col-h">Status</div>
+                <div className="col-h">Ping</div>
+                <div className="col-h">Latency</div>
+                <div className="col-h" style={{ textAlign: 'right' }}>Outages</div>
+                <div></div>
+              </div>
+              <div id="siteList">
+                {safeSites.length === 0 ? (
+                  <div className="empty-state">No sites added yet — add sites to begin.</div>
+                ) : (
+                  safeSites.map(site => site && (
+                    <div key={site.id} className="site-row clickable" onClick={() => site.url && window.open(site.url, '_blank')}>
+                      <div className={`status-dot ${site.status === 'success' ? 'online' : site.status === 'lan_up' ? 'lan' : site.status === 'slow' ? 'degraded' : 'offline'}`} title={site.status === 'lan_up' ? 'Reachable via LAN' : site.status === 'slow' ? 'Degraded' : site.status === 'success' ? 'Online' : 'Offline'}></div>
+                      <div>
+                        <div className="site-name">
+                          <Icon name={site.icon} size={18} style={{ marginRight: '8px', color: 'var(--text2)' }} />
+                          {site.name}
+                        </div>
+                        <div className="site-url">{site.url ? site.url.replace(/^https?:\/\//, '') : ''}</div>
                       </div>
-                      <div className="site-url">{site.url ? site.url.replace(/^https?:\/\//, '') : ''}</div>
-                    </div>
-                    <div className={`badge ${site.status === 'success' ? 'online' : site.status === 'lan_up' ? 'lan' : site.status === 'slow' ? 'degraded' : 'offline'}`}>
-                      {site.status === 'success' ? 'Online' : site.status === 'lan_up' ? 'LAN' : site.status === 'slow' ? 'Slow' : 'Offline'}
-                    </div>
-                    <div className="ping-val">{site.latency ? `${Math.round(site.latency)}ms` : '—'}</div>
-                    <div>
-                      <div className="latency-bar" style={site.status === 'lan_up' ? { border: '2px dotted #2fa87e', background: 'transparent' } : {}}>
-                        <div
-                          className="latency-fill"
-                          style={{
-                            width: site.status === 'lan_up' ? '0%' : `${Math.max(0, 100 - Math.min((site.latency || 0) / 30, 100))}%`,
-                            background: site.status === 'lan_up' ? 'transparent' : (site.latency || 0) >= 3000 ? 'var(--down)' : (site.latency || 0) >= 2000 ? 'var(--degraded)' : 'var(--up)',
-                            border: 'none'
-                          }}
-                        ></div>
+                      <div className={`badge ${site.status === 'success' ? 'online' : site.status === 'lan_up' ? 'lan' : site.status === 'slow' ? 'degraded' : 'offline'}`}>
+                        {site.status === 'success' ? 'Online' : site.status === 'lan_up' ? 'LAN' : site.status === 'slow' ? 'Slow' : 'Offline'}
                       </div>
-                      <div className="latency-sub" style={{ color: (site.latency || 0) >= 3000 ? 'var(--down)' : (site.latency || 0) >= 2000 ? 'var(--degraded)' : 'var(--up)' }}>
-                        {site.latency ? (site.latency < 100 ? 'Very Fast' : site.latency < 2000 ? 'Fast' : site.latency < 3000 ? 'Slow' : 'Very Slow') : '—'}
+                      <div className="ping-val">{site.latency ? `${Math.round(site.latency)}ms` : '—'}</div>
+                      <div>
+                        <div className="latency-bar" style={site.status === 'lan_up' ? { border: '2px dotted #2fa87e', background: 'transparent' } : {}}>
+                          <div
+                            className="latency-fill"
+                            style={{
+                              width: site.status === 'lan_up' ? '0%' : `${Math.max(0, 100 - Math.min((site.latency || 0) / 30, 100))}%`,
+                              background: site.status === 'lan_up' ? 'transparent' : (site.latency || 0) >= 3000 ? 'var(--down)' : (site.latency || 0) >= 2000 ? 'var(--degraded)' : 'var(--up)',
+                              border: 'none'
+                            }}
+                          ></div>
+                        </div>
+                        <div className="latency-sub" style={{ color: (site.latency || 0) >= 3000 ? 'var(--down)' : (site.latency || 0) >= 2000 ? 'var(--degraded)' : 'var(--up)' }}>
+                          {site.latency ? (site.latency < 100 ? 'Very Fast' : site.latency < 2000 ? 'Fast' : site.latency < 3000 ? 'Slow' : 'Very Slow') : '—'}
+                        </div>
+                      </div>
+                      <div className="outage-badge" title="External outages recorded">
+                        {(site.outage_count || 0) > 0 ? `${site.outage_count} ↓` : '—'}
+                      </div>
+                      <div style={{ display: 'flex', gap: '4px' }} onClick={(e) => e.stopPropagation()}>
+                        <button className="delete-btn" onClick={() => handleEditSite(site)} title="Edit">
+                          <Pencil size={12} />
+                        </button>
+                        <button className="delete-btn" onClick={() => handleDeleteSite(site.id, site.name)} title="Remove">
+                          <Trash2 size={12} />
+                        </button>
                       </div>
                     </div>
-                    <div className="outage-badge" title="External outages recorded">
-                      {(site.outage_count || 0) > 0 ? `${site.outage_count} ↓` : '—'}
-                    </div>
-                    <div style={{ display: 'flex', gap: '4px' }} onClick={(e) => e.stopPropagation()}>
-                      <button className="delete-btn" onClick={() => handleEditSite(site)} title="Edit">
-                        <Pencil size={12} />
-                      </button>
-                      <button className="delete-btn" onClick={() => handleDeleteSite(site.id, site.name)} title="Remove">
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Memory and Server Connectivity metrics side by side inside the Left Column */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
+              {/* Memory Pressure */}
+              <div className="panel" style={{ margin: 0 }}>
+                <div className="panel-header">
+                  <span className="panel-title">Memory Pressure</span>
+                  <span className="last-check-label">RAM trend</span>
+                </div>
+                <div className="chart-wrap" style={{ height: '170px' }}>
+                  <Line
+                    data={memoryChartData}
+                    options={{ ...chartOptions, scales: { ...chartOptions.scales, y: { ...chartOptions.scales.y, min: 0, max: 100, ticks: { ...chartOptions.scales.y.ticks, stepSize: 20 } } } }}
+                  />
+                </div>
+              </div>
+
+              {/* Server Connectivity */}
+              <div className="panel" style={{ margin: 0 }}>
+                <div className="panel-header">
+                  <span className="panel-title">Server Connectivity</span>
+                  <span className="last-check-label">internet history</span>
+                </div>
+                <div className="chart-wrap" style={{ height: '170px' }}>
+                  <Line data={connectivityChartData} options={connectivityChartOptions} />
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Bento Card 13: Response Time Trend */}
-          <div className="panel span-4">
-            <div className="panel-header">
-              <span className="panel-title">Response Time Trend</span>
-              <span className="last-check-label">last 100 checks</span>
+          {/* Right Column (span-4) containing Response Time and Active Processes */}
+          <div className="span-4" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            {/* Response Time Trend (Shorter) */}
+            <div className="panel" style={{ margin: 0 }}>
+              <div className="panel-header">
+                <span className="panel-title">Response Time Trend</span>
+                <span className="last-check-label">last 100 checks</span>
+              </div>
+              <div className="chart-wrap" style={{ height: '120px' }}>
+                <Line data={chartData} options={chartOptions} />
+              </div>
             </div>
-            <div className="chart-wrap" style={{ height: '240px' }}>
-              <Line data={chartData} options={chartOptions} />
-            </div>
-          </div>
 
-          {/* Bento Card 14: Memory Pressure Trend */}
-          <div className="panel span-4">
-            <div className="panel-header">
-              <span className="panel-title">Memory Pressure</span>
-              <span className="last-check-label">RAM trend</span>
-            </div>
-            <div className="chart-wrap" style={{ height: '180px' }}>
-              <Line
-                data={memoryChartData}
-                options={{ ...chartOptions, scales: { ...chartOptions.scales, y: { ...chartOptions.scales.y, min: 0, max: 100, ticks: { ...chartOptions.scales.y.ticks, stepSize: 20 } } } }}
-              />
-            </div>
-          </div>
-
-          {/* Bento Card 15: Server Connectivity History */}
-          <div className="panel span-4">
-            <div className="panel-header">
-              <span className="panel-title">Server Connectivity</span>
-              <span className="last-check-label">internet history</span>
-            </div>
-            <div className="chart-wrap" style={{ height: '180px' }}>
-              <Line data={connectivityChartData} options={connectivityChartOptions} />
-            </div>
-          </div>
-
-          {/* Bento Card 15.5: Active Processes (BTOP Proc style) */}
-          <div className="panel span-4" style={{ display: 'flex', flexDirection: 'column', height: '248px' }}>
-            <div className="panel-header" style={{ padding: '1.25rem 1.25rem 0.5rem 1.25rem', borderBottom: 'none' }}>
-              <span className="panel-title">Active Processes</span>
-            </div>
-            <div className="proc-list-container" style={{ flex: 1, overflowY: 'auto', padding: '0 1.25rem 1.25rem 1.25rem', fontSize: '0.68rem', fontFamily: 'DM Mono' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', color: 'var(--text2)' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--text3)' }}>
-                    <th style={{ padding: '4px 0' }}>PID</th>
-                    <th>CMD</th>
-                    <th>USER</th>
-                    <th style={{ textAlign: 'right' }}>MEM</th>
-                    <th style={{ textAlign: 'right' }}>CPU</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {processes.map((proc, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid rgba(200,200,200,0.02)' }}>
-                      <td style={{ padding: '4px 0', color: 'var(--accent)' }}>{proc.pid}</td>
-                      <td style={{ maxWidth: '75px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={proc.name}>{proc.name}</td>
-                      <td>{proc.user}</td>
-                      <td style={{ textAlign: 'right' }}>{proc.mem}M</td>
-                      <td style={{ textAlign: 'right', color: proc.cpu > 20 ? 'var(--down)' : 'var(--up)' }}>{proc.cpu}%</td>
+            {/* Active Processes (Fills the remaining height) */}
+            <div className="panel" style={{ display: 'flex', flexDirection: 'column', flex: 1, margin: 0, minHeight: '380px' }}>
+              <div className="panel-header" style={{ padding: '1.25rem 1.25rem 0.5rem 1.25rem', borderBottom: 'none' }}>
+                <span className="panel-title">Active Processes</span>
+              </div>
+              <div className="proc-list-container" style={{ flex: 1, overflowY: 'auto', padding: '0 1.25rem 1.25rem 1.25rem', fontSize: '0.68rem', fontFamily: 'DM Mono' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', color: 'var(--text2)' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--text3)' }}>
+                      <th style={{ padding: '4px 0' }}>PID</th>
+                      <th>CMD</th>
+                      <th>USER</th>
+                      <th style={{ textAlign: 'right' }}>MEM</th>
+                      <th style={{ textAlign: 'right' }}>CPU</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {processes.map((proc, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid rgba(200,200,200,0.02)' }}>
+                        <td style={{ padding: '4px 0', color: 'var(--accent)' }}>{proc.pid}</td>
+                        <td style={{ maxWidth: '75px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={proc.name}>{proc.name}</td>
+                        <td>{proc.user}</td>
+                        <td style={{ textAlign: 'right' }}>{proc.mem}M</td>
+                        <td style={{ textAlign: 'right', color: proc.cpu > 20 ? 'var(--down)' : 'var(--up)' }}>{proc.cpu}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 

@@ -890,7 +890,7 @@ def get_processes():
                 pass
         
         # Sort by CPU descending
-        processes = sorted(processes, key=lambda x: x['cpu'], reverse=True)[:50]
+        processes = sorted(processes, key=lambda x: x['cpu'], reverse=True)[:150]
         return processes
     except Exception as e:
         logger.error(f"Error fetching processes: {e}")
