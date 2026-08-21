@@ -426,7 +426,6 @@ header {
 }
 .settings-icon:hover { border-color: var(--text); }
 
-.settings-panel {
 /* ── Settings Drawer Slide-out ── */
 .drawer-backdrop {
   position: fixed;
