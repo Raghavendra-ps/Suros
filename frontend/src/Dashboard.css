@@ -943,3 +943,46 @@ canvas { width: 100% !important; }
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Bento Grid Layout ── */
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 1.5rem;
+  margin-top: 1rem;
+  margin-bottom: 3rem;
+}
+
+.span-3 { grid-column: span 3; }
+.span-4 { grid-column: span 4; }
+.span-6 { grid-column: span 6; }
+.span-8 { grid-column: span 8; }
+.span-12 { grid-column: span 12; }
+
+/* Ensure card panel components inside grid stretch nicely */
+.bento-grid > .panel,
+.bento-grid > .stat-card,
+.bento-grid > .dial-card {
+  margin: 0 !important;
+  height: 100%;
+}
+
+@media (max-width: 1024px) {
+  .bento-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+  .span-3 { grid-column: span 3; }
+  .span-4 { grid-column: span 3; }
+  .span-6 { grid-column: span 6; }
+  .span-8 { grid-column: span 6; }
+  .span-12 { grid-column: span 6; }
+}
+
+@media (max-width: 768px) {
+  .bento-grid {
+    grid-template-columns: 1fr;
+  }
+  .span-3, .span-4, .span-6, .span-8, .span-12 {
+    grid-column: span 1;
+  }
+}
