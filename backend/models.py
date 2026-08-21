@@ -48,6 +48,17 @@ class Settings(Base):
     id = Column(Integer, primary_key=True, index=True)
     dashboard_name = Column(String, default="Odyssey")
     logo_url = Column(String, nullable=True)
+    email_enabled = Column(Integer, default=0)
+    email_provider = Column(String, default="gmail")
+    email_smtp_server = Column(String, nullable=True)
+    email_smtp_port = Column(Integer, default=587)
+    email_username = Column(String, nullable=True)
+    email_password = Column(String, nullable=True)
+    email_recipient = Column(String, nullable=True)
+    ntfy_enabled = Column(Integer, default=0)
+    ntfy_url = Column(String, default="https://ntfy.sh")
+    ntfy_topic = Column(String, nullable=True)
+    ntfy_token = Column(String, nullable=True)
 
 class DriveAlias(Base):
     __tablename__ = "drive_aliases"

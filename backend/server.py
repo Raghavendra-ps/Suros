@@ -3,6 +3,10 @@ import time
 import requests
 import psutil
 import subprocess
+import smtplib
+from email.mime.text import MIMEText
+from email.header import Header
+import httpx
 import logging
 import os
 import json
@@ -79,9 +83,146 @@ class SiteSchema(SiteBase):
 class SettingsSchema(BaseModel):
     dashboard_name: str
     logo_url: Optional[str] = None
+    email_enabled: Optional[int] = 0
+    email_provider: Optional[str] = "gmail"
+    email_smtp_server: Optional[str] = None
+    email_smtp_port: Optional[int] = 587
+    email_username: Optional[str] = None
+    email_password: Optional[str] = None
+    email_recipient: Optional[str] = None
+    ntfy_enabled: Optional[int] = 0
+    ntfy_url: Optional[str] = "https://ntfy.sh"
+    ntfy_topic: Optional[str] = None
+    ntfy_token: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+async def send_email_resend(api_key: str, recipient: str, subject: str, body: str):
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "from": "onboarding@resend.dev",
+        "to": [recipient],
+        "subject": subject,
+        "html": f"<p>{body}</p>"
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post("https://api.resend.com/emails", json=data, headers=headers, timeout=5.0)
+            if resp.status_code >= 200 and resp.status_code < 300:
+                return True, None
+            return False, resp.text
+    except Exception as e:
+        return False, str(e)
+
+def _send_smtp_sync(smtp_server, smtp_port, username, password, recipient, subject, body):
+    msg = MIMEText(body, 'plain', 'utf-8')
+    msg['Subject'] = Header(subject, 'utf-8')
+    msg['From'] = username
+    msg['To'] = recipient
+    
+    server = None
+    try:
+        if smtp_port == 465:
+            server = smtplib.SMTP_SSL(smtp_server, smtp_port)
+        else:
+            server = smtplib.SMTP(smtp_server, smtp_port)
+            server.starttls()
+            
+        server.login(username, password)
+        server.sendmail(username, [recipient], msg.as_string())
+        return True, None
+    except Exception as e:
+        return False, str(e)
+    finally:
+        if server:
+            try:
+                server.quit()
+            except:
+                pass
+
+async def send_email_alert(settings, subject, body):
+    if settings.email_provider == "resend":
+        api_key = settings.email_password
+        recipient = settings.email_recipient
+        if not api_key or not recipient:
+            return False, "Missing Resend API Key or recipient"
+        return await send_email_resend(api_key, recipient, subject, body)
+    else:
+        smtp_server = settings.email_smtp_server
+        smtp_port = settings.email_smtp_port
+        username = settings.email_username
+        password = settings.email_password
+        recipient = settings.email_recipient
+        
+        if not smtp_server:
+            if settings.email_provider == "gmail":
+                smtp_server = "smtp.gmail.com"
+                smtp_port = 587
+            elif settings.email_provider == "microsoft":
+                smtp_server = "smtp.office365.com"
+                smtp_port = 587
+            elif settings.email_provider == "apple":
+                smtp_server = "smtp.mail.me.com"
+                smtp_port = 587
+                
+        if not smtp_server or not username or not password or not recipient:
+            return False, "Missing SMTP server settings or credentials"
+            
+        return await asyncio.to_thread(
+            _send_smtp_sync,
+            smtp_server,
+            smtp_port,
+            username,
+            password,
+            recipient,
+            subject,
+            body
+        )
+
+async def send_ntfy_alert(settings, title, message):
+    if not settings.ntfy_topic:
+        return False, "Missing ntfy topic"
+        
+    url = f"{settings.ntfy_url.rstrip('/')}/{settings.ntfy_topic}"
+    headers = {
+        "Title": title
+    }
+    if settings.ntfy_token:
+        headers["Authorization"] = f"Bearer {settings.ntfy_token}"
+        
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(url, content=message, headers=headers, timeout=5.0)
+            if resp.status_code >= 200 and resp.status_code < 300:
+                return True, None
+            return False, resp.text
+    except Exception as e:
+        return False, str(e)
+
+async def trigger_system_alert(title: str, message: str):
+    db = SessionLocal()
+    try:
+        settings = db.query(models.Settings).first()
+        if not settings:
+            return
+            
+        if settings.email_enabled:
+            email_ok, email_err = await send_email_alert(settings, title, message)
+            if not email_ok:
+                logger.error(f"Failed to send email alert: {email_err}")
+                
+        if settings.ntfy_enabled:
+            ntfy_ok, ntfy_err = await send_ntfy_alert(settings, title, message)
+            if not ntfy_ok:
+                logger.error(f"Failed to send ntfy alert: {ntfy_err}")
+    except Exception as e:
+        logger.error(f"Error triggering system alert: {e}")
+    finally:
+        db.close()
 
 class DriveAliasCreate(BaseModel):
     device: str
@@ -332,6 +473,10 @@ async def monitor_sites_task():
                         ev.ended_at = datetime.utcnow()
                     current_outage_type = None
                     current_outage_start = None
+                asyncio.create_task(trigger_system_alert(
+                    "Host Network Restored",
+                    "The Odyssey host server network connection is back ONLINE."
+                ))
 
             if not server_online and last_network_online:
                 # Network went offline — start a new outage
@@ -343,6 +488,10 @@ async def monitor_sites_task():
                 db.add(new_outage)
                 current_outage_type = 'network'
                 current_outage_start = datetime.utcnow()
+                asyncio.create_task(trigger_system_alert(
+                    "Host Network Outage",
+                    "The Odyssey host server network connection is OFFLINE."
+                ))
 
             last_network_online = server_online
 
@@ -351,13 +500,10 @@ async def monitor_sites_task():
             for site in sites:
                 status, latency = await asyncio.to_thread(check_site_status, site.url)
                 site.status = status
-                # Use the latency from the site-specific check, not the shared external ping
                 site.latency = latency if latency is not None else net_lat
                 site.last_checked = datetime.utcnow()
 
-                # Detect external outages for sites (when status becomes 'down' not 'lan_up')
-                # We'll count transitions into 'down' from any other status
-                # Check last history entry for this site
+                # Detect external outages for sites
                 last_h = db.query(models.History).filter(
                     models.History.site_id == site.id
                 ).order_by(models.History.timestamp.desc()).first()
@@ -366,8 +512,16 @@ async def monitor_sites_task():
                 is_down = status == 'down'
 
                 if is_down and not was_down:
-                    # Site went down externally — increment outage count
                     site.outage_count = (site.outage_count or 0) + 1
+                    asyncio.create_task(trigger_system_alert(
+                        f"Site Offline: {site.name}",
+                        f"The site {site.name} ({site.url}) went OFFLINE. Last latency check returned status: {status}."
+                    ))
+                elif not is_down and was_down:
+                    asyncio.create_task(trigger_system_alert(
+                        f"Site Recovered: {site.name}",
+                        f"The site {site.name} ({site.url}) is back ONLINE. Current status: {status}."
+                    ))
 
                 # Add site history entry
                 history_entry = models.History(
@@ -732,31 +886,105 @@ def get_logo():
 
 @app.get("/api/settings", response_model=SettingsSchema)
 def get_settings(db: Session = Depends(get_db)):
-    """Get dashboard settings (name and logo)"""
+    """Get dashboard settings"""
     settings = db.query(models.Settings).first()
     if not settings:
         # Create default settings
-        settings = models.Settings(dashboard_name="Odyssey", logo_url=None)
+        settings = models.Settings(
+            dashboard_name="Odyssey", 
+            logo_url=None,
+            email_enabled=0,
+            email_provider="gmail",
+            email_smtp_server=None,
+            email_smtp_port=587,
+            email_username=None,
+            email_password=None,
+            email_recipient=None,
+            ntfy_enabled=0,
+            ntfy_url="https://ntfy.sh",
+            ntfy_topic=None,
+            ntfy_token=None
+        )
         db.add(settings)
         db.commit()
     return settings
 
 @app.put("/api/settings", response_model=SettingsSchema)
 def update_settings(settings_data: SettingsSchema, db: Session = Depends(get_db)):
-    """Update dashboard settings (name and logo)"""
+    """Update dashboard settings"""
     settings = db.query(models.Settings).first()
     if not settings:
         settings = models.Settings(
             dashboard_name=settings_data.dashboard_name,
-            logo_url=settings_data.logo_url
+            logo_url=settings_data.logo_url,
+            email_enabled=settings_data.email_enabled,
+            email_provider=settings_data.email_provider,
+            email_smtp_server=settings_data.email_smtp_server,
+            email_smtp_port=settings_data.email_smtp_port,
+            email_username=settings_data.email_username,
+            email_password=settings_data.email_password,
+            email_recipient=settings_data.email_recipient,
+            ntfy_enabled=settings_data.ntfy_enabled,
+            ntfy_url=settings_data.ntfy_url,
+            ntfy_topic=settings_data.ntfy_topic,
+            ntfy_token=settings_data.ntfy_token
         )
         db.add(settings)
     else:
         settings.dashboard_name = settings_data.dashboard_name
         if settings_data.logo_url is not None:
             settings.logo_url = settings_data.logo_url
+        settings.email_enabled = settings_data.email_enabled
+        settings.email_provider = settings_data.email_provider
+        settings.email_smtp_server = settings_data.email_smtp_server
+        settings.email_smtp_port = settings_data.email_smtp_port
+        settings.email_username = settings_data.email_username
+        settings.email_password = settings_data.email_password
+        settings.email_recipient = settings_data.email_recipient
+        settings.ntfy_enabled = settings_data.ntfy_enabled
+        settings.ntfy_url = settings_data.ntfy_url
+        settings.ntfy_topic = settings_data.ntfy_topic
+        settings.ntfy_token = settings_data.ntfy_token
     db.commit()
     return settings
+
+@app.post("/api/settings/test-notification")
+async def test_notification(db: Session = Depends(get_db)):
+    settings = db.query(models.Settings).first()
+    if not settings:
+        raise HTTPException(status_code=404, detail="Settings not configured")
+    
+    success = False
+    details = []
+    
+    if settings.email_enabled:
+        email_ok, email_err = await send_email_alert(
+            settings,
+            "Test Alert",
+            "This is a test alert notification from your Odyssey dashboard. Outage monitoring is functioning correctly!"
+        )
+        if email_ok:
+            success = True
+            details.append("Email sent successfully")
+        else:
+            details.append(f"Email failed: {email_err}")
+            
+    if settings.ntfy_enabled:
+        ntfy_ok, ntfy_err = await send_ntfy_alert(
+            settings,
+            "Test Alert",
+            "This is a test alert notification from your Odyssey dashboard."
+        )
+        if ntfy_ok:
+            success = True
+            details.append("ntfy notification sent successfully")
+        else:
+            details.append(f"ntfy failed: {ntfy_err}")
+            
+    if not settings.email_enabled and not settings.ntfy_enabled:
+        raise HTTPException(status_code=400, detail="No notification providers enabled")
+        
+    return {"success": success, "details": details}
 
 def check_drive_smart_status(device: str):
     try:

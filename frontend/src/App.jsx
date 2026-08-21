@@ -5,7 +5,7 @@ import { Line } from 'react-chartjs-2';
 import {
   Trash2, Plus, Moon, Sun, Activity, RefreshCw, Pencil,
   Server, Globe, Database, Cpu, Layers, Terminal, Box, Mail, Shield, HardDrive, Monitor, Link as LinkIcon,
-  Check, AlertTriangle, MoreVertical
+  Check, AlertTriangle, MoreVertical, Settings
 } from 'lucide-react';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
@@ -46,6 +46,25 @@ const App = () => {
   const [theme, setTheme] = useState(localStorage.getItem('odyssey_theme') || 'dark');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSite, setEditingSite] = useState(null);
+
+  // Settings Slide-out & Alert state
+  const [settings, setSettings] = useState({
+    dashboard_name: 'Odyssey',
+    logo_url: null,
+    email_enabled: 0,
+    email_provider: 'gmail',
+    email_smtp_server: '',
+    email_smtp_port: 587,
+    email_username: '',
+    email_password: '',
+    email_recipient: '',
+    ntfy_enabled: 0,
+    ntfy_url: 'https://ntfy.sh',
+    ntfy_topic: '',
+    ntfy_token: ''
+  });
+  const [activeSettingsTab, setActiveSettingsTab] = useState('general');
+  const [testStatus, setTestStatus] = useState(null);
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
   const [renameDevice, setRenameDevice] = useState('');
   const [renameVal, setRenameVal] = useState('');
@@ -109,6 +128,7 @@ const App = () => {
       const res = await axios.get('/api/settings');
       setCustomName(res.data.dashboard_name || 'Odyssey');
       setCustomLogo(res.data.logo_url || null);
+      setSettings(res.data);
     } catch (err) {
       console.error('Error fetching settings:', err);
     }
@@ -154,16 +174,30 @@ const App = () => {
   const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
   const toggleSettings = () => setSettingsOpen(!settingsOpen);
 
-  const handleCustomNameChange = async (val) => {
-    setCustomName(val);
+  const handleSaveAlertSettings = async (updatedSettings) => {
     try {
-      await axios.put('/api/settings', {
-        dashboard_name: val,
-        logo_url: customLogo
-      });
+      const res = await axios.put('/api/settings', updatedSettings);
+      setSettings(res.data);
+      setCustomName(res.data.dashboard_name || 'Odyssey');
+      setCustomLogo(res.data.logo_url || null);
     } catch (err) {
       console.error('Error updating settings:', err);
     }
+  };
+
+  const handleTestNotifications = async () => {
+    setTestStatus('Sending test notification...');
+    try {
+      const res = await axios.post('/api/settings/test-notification');
+      if (res.data.success) {
+        setTestStatus('Success! ' + res.data.details.join(', '));
+      } else {
+        setTestStatus('Failed: ' + res.data.details.join(', '));
+      }
+    } catch (err) {
+      setTestStatus('Failed: ' + (err.response?.data?.detail || err.message));
+    }
+    setTimeout(() => setTestStatus(null), 5000);
   };
 
   const handleLogoUpload = async (e) => {
@@ -202,7 +236,7 @@ const App = () => {
       }
       setIsModalOpen(false);
       setEditingSite(null);
-      setNewSite({ name: '', url: '', icon: 'Globe' });
+      setNewSite({ name: '', url: '', icon: '' });
       fetchSites();
     } catch (err) {
       console.error('Error saving site:', err);
@@ -211,7 +245,7 @@ const App = () => {
 
   const handleEditSite = (site) => {
     setEditingSite(site);
-    setNewSite({ name: site.name, url: site.url, icon: site.icon || 'Globe' });
+    setNewSite({ name: site.name, url: site.url, icon: site.icon || '' });
     setIsModalOpen(true);
   };
 
@@ -391,8 +425,16 @@ const App = () => {
   return (
     <div className="app-container">
       <header>
-        <div className="logo">
-          <div className="logo-circle">
+        <div className="logo" style={{ display: 'flex', alignItems: 'center' }}>
+          <button 
+            className="settings-icon-btn" 
+            onClick={toggleSettings} 
+            title="Open Settings" 
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text)' }}
+          >
+            <Settings size={20} />
+          </button>
+          <div className="logo-circle" style={{ marginLeft: '12px' }}>
             {customLogo ? (
               <img src={customLogo} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
@@ -401,83 +443,231 @@ const App = () => {
           </div>
           <span className="logo-text">{customName || 'Odyssey'}</span>
         </div>
-        <div className="header-right">
-          <button className="settings-icon" onClick={toggleSettings}>⚙</button>
-        </div>
       </header>
 
-      {/* Settings Panel */}
-      <div className={`settings-panel ${settingsOpen ? 'open' : ''}`}>
-        <div className="settings-panel-header">
-          <span className="settings-panel-title">Settings</span>
-          <button className="settings-icon" onClick={toggleSettings} style={{ width: 28, height: 28 }}>✕</button>
+      {/* Settings Drawer Slide-out Backdrop Overlay */}
+      {settingsOpen && (
+        <div className="drawer-backdrop" onClick={() => setSettingsOpen(false)}></div>
+      )}
+      
+      {/* Settings Drawer Panel */}
+      <div className={`settings-drawer ${settingsOpen ? 'open' : ''}`}>
+        <div className="drawer-header">
+          <h2>Settings Panel</h2>
+          <button className="close-btn" onClick={() => setSettingsOpen(false)}>✕</button>
         </div>
-        <div className="settings-section">
-          <label>Custom Tab Name</label>
-          <input type="text" value={customName} onChange={(e) => handleCustomNameChange(e.target.value)} placeholder="e.g. My Server" />
-        </div>
-        <div className="settings-section">
-          <label>Custom Logo</label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div className="logo-circle" style={{ width: 28, height: 28, cursor: 'pointer' }} onClick={() => document.getElementById('logo-upload-input').click()}>
-              {customLogo ? (
-                <img src={customLogo} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-              ) : (
-                <div className="logo-circle-placeholder" style={{ width: 14, height: 14, borderRadius: '50%', background: 'var(--accent)', opacity: 0.5 }} />
-              )}
-            </div>
-            <button className="logo-upload-btn" onClick={() => document.getElementById('logo-upload-input').click()}>Upload Image</button>
-            <input id="logo-upload-input" type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
-          </div>
-        </div>
-        <div className="settings-section">
-          <label>Add Site</label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <input
-              type="text"
-              value={newSite.name}
-              onChange={(e) => setNewSite({ ...newSite, name: e.target.value })}
-              placeholder="Site Name"
-            />
-            <input
-              type="text"
-              value={newSite.url}
-              onChange={(e) => setNewSite({ ...newSite, url: e.target.value })}
-              placeholder="URL (e.g. https://example.com)"
-            />
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.3rem', marginTop: '0.3rem' }}>
-              {ICONS.map(icon => (
-                <button
-                  key={icon}
-                  className={`icon-btn ${newSite.icon === icon ? 'active' : ''}`}
-                  onClick={() => setNewSite({ ...newSite, icon })}
-                  style={{ width: 32, height: 32 }}
-                >
-                  <Icon name={icon} size={14} />
+        
+        <div className="drawer-split-layout">
+          {/* LEFT SIDE: Fields & Inputs */}
+          <div className="drawer-fields-container">
+            {activeSettingsTab === 'general' && (
+              <div className="settings-section-fields">
+                <h3>General Settings</h3>
+                
+                <div className="form-group">
+                  <label>Dashboard Name</label>
+                  <input 
+                    type="text" 
+                    value={settings.dashboard_name || ''} 
+                    onChange={(e) => handleSaveAlertSettings({ ...settings, dashboard_name: e.target.value })}
+                    placeholder="e.g. Odyssey Dashboard" 
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Logo</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '4px' }}>
+                    <div className="logo-circle" style={{ width: 36, height: 36, cursor: 'pointer' }} onClick={() => document.getElementById('logo-upload-input').click()}>
+                      {customLogo ? (
+                        <img src={customLogo} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                      ) : (
+                        <div className="logo-circle-placeholder" style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--accent)', opacity: 0.5 }} />
+                      )}
+                    </div>
+                    <button className="btn" onClick={() => document.getElementById('logo-upload-input').click()} style={{ padding: '6px 12px', fontSize: '0.8rem' }}>Upload Image</button>
+                    <input id="logo-upload-input" type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginTop: '1.5rem' }}>
+                  <div className="theme-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Theme mode</span>
+                    <button className="theme-toggle" onClick={toggleTheme}>
+                      {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeSettingsTab === 'email' && (
+              <div className="settings-section-fields">
+                <h3>Email Outage Alerts</h3>
+                
+                <div className="form-group">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={settings.email_enabled === 1} 
+                      onChange={(e) => handleSaveAlertSettings({ ...settings, email_enabled: e.target.checked ? 1 : 0 })}
+                    />
+                    Enable Email Alerts
+                  </label>
+                </div>
+                
+                <div className="form-group">
+                  <label>Provider</label>
+                  <select 
+                    value={settings.email_provider || 'gmail'} 
+                    onChange={(e) => handleSaveAlertSettings({ ...settings, email_provider: e.target.value })}
+                  >
+                    <option value="gmail">Gmail App Password</option>
+                    <option value="microsoft">Microsoft (Outlook/Office365)</option>
+                    <option value="apple">Apple iCloud</option>
+                    <option value="resend">Resend API</option>
+                  </select>
+                </div>
+                
+                {settings.email_provider === 'resend' ? (
+                  <div className="form-group">
+                    <label>Resend API Key</label>
+                    <input 
+                      type="password" 
+                      value={settings.email_password || ''} 
+                      onChange={(e) => handleSaveAlertSettings({ ...settings, email_password: e.target.value })}
+                      placeholder="re_..." 
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div className="form-group">
+                      <label>SMTP Username / Email</label>
+                      <input 
+                        type="email" 
+                        value={settings.email_username || ''} 
+                        onChange={(e) => handleSaveAlertSettings({ ...settings, email_username: e.target.value })}
+                        placeholder="your-email@provider.com" 
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>SMTP Password / App Password</label>
+                      <input 
+                        type="password" 
+                        value={settings.email_password || ''} 
+                        onChange={(e) => handleSaveAlertSettings({ ...settings, email_password: e.target.value })}
+                        placeholder="••••••••••••••••" 
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Custom SMTP Server (optional)</label>
+                      <input 
+                        type="text" 
+                        value={settings.email_smtp_server || ''} 
+                        onChange={(e) => handleSaveAlertSettings({ ...settings, email_smtp_server: e.target.value })}
+                        placeholder="smtp.provider.com" 
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>SMTP Port (optional)</label>
+                      <input 
+                        type="number" 
+                        value={settings.email_smtp_port || 587} 
+                        onChange={(e) => handleSaveAlertSettings({ ...settings, email_smtp_port: parseInt(e.target.value) || 587 })}
+                        placeholder="587" 
+                      />
+                    </div>
+                  </>
+                )}
+                
+                <div className="form-group">
+                  <label>Recipient Address</label>
+                  <input 
+                    type="email" 
+                    value={settings.email_recipient || ''} 
+                    onChange={(e) => handleSaveAlertSettings({ ...settings, email_recipient: e.target.value })}
+                    placeholder="notifications@recipient.com" 
+                  />
+                </div>
+                
+                <button className="btn btn-accent" onClick={handleTestNotifications} style={{ marginTop: '1rem' }}>
+                  Test Connection
                 </button>
-              ))}
-            </div>
-            <button
-              className="btn btn-accent"
-              onClick={() => {
-                if (!newSite.name || !newSite.url) return;
-                let url = newSite.url;
-                if (!url.startsWith('http')) url = 'https://' + url;
-                handleAddSite({ ...newSite, url });
-                setNewSite({ name: '', url: '', icon: 'Globe' });
-                setSettingsOpen(false);
-              }}
-              style={{ alignSelf: 'flex-end', marginTop: '0.3rem' }}
-            >
-              + Add Site
-            </button>
+                {testStatus && <div className="test-status-msg">{testStatus}</div>}
+              </div>
+            )}
+
+            {activeSettingsTab === 'ntfy' && (
+              <div className="settings-section-fields">
+                <h3>ntfy Push Alerts</h3>
+                
+                <div className="form-group">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={settings.ntfy_enabled === 1} 
+                      onChange={(e) => handleSaveAlertSettings({ ...settings, ntfy_enabled: e.target.checked ? 1 : 0 })}
+                    />
+                    Enable ntfy Alerts
+                  </label>
+                </div>
+                
+                <div className="form-group">
+                  <label>ntfy Server URL</label>
+                  <input 
+                    type="text" 
+                    value={settings.ntfy_url || ''} 
+                    onChange={(e) => handleSaveAlertSettings({ ...settings, ntfy_url: e.target.value })}
+                    placeholder="https://ntfy.sh" 
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Topic</label>
+                  <input 
+                    type="text" 
+                    value={settings.ntfy_topic || ''} 
+                    onChange={(e) => handleSaveAlertSettings({ ...settings, ntfy_topic: e.target.value })}
+                    placeholder="my-secret-topic" 
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Access Token (optional)</label>
+                  <input 
+                    type="password" 
+                    value={settings.ntfy_token || ''} 
+                    onChange={(e) => handleSaveAlertSettings({ ...settings, ntfy_token: e.target.value })}
+                    placeholder="tk_..." 
+                  />
+                </div>
+                
+                <button className="btn btn-accent" onClick={handleTestNotifications} style={{ marginTop: '1rem' }}>
+                  Test Connection
+                </button>
+                {testStatus && <div className="test-status-msg">{testStatus}</div>}
+              </div>
+            )}
           </div>
-        </div>
-        <div className="settings-section">
-          <div className="theme-row">
-            <span>Dark Mode</span>
-            <button className="theme-toggle" onClick={toggleTheme}>
-              {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
+          
+          {/* RIGHT SIDE: Category Sidebar Selector */}
+          <div className="drawer-sidebar">
+            <button 
+              className={`sidebar-tab-btn ${activeSettingsTab === 'general' ? 'active' : ''}`}
+              onClick={() => setActiveSettingsTab('general')}
+            >
+              General Settings
+            </button>
+            <button 
+              className={`sidebar-tab-btn ${activeSettingsTab === 'email' ? 'active' : ''}`}
+              onClick={() => setActiveSettingsTab('email')}
+            >
+              Email Alerts
+            </button>
+            <button 
+              className={`sidebar-tab-btn ${activeSettingsTab === 'ntfy' ? 'active' : ''}`}
+              onClick={() => setActiveSettingsTab('ntfy')}
+            >
+              ntfy Push Alerts
             </button>
           </div>
         </div>
@@ -681,9 +871,22 @@ const App = () => {
 
           {/* Bento Card 12: Monitored Sites List */}
           <div className="panel span-8">
-            <div className="panel-header">
-              <span className="panel-title">Monitored Sites</span>
-              <span className="last-check-label">{sites.length} sites</span>
+            <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span className="panel-title">Monitored Sites</span>
+                <span className="last-check-label">{sites.length} sites</span>
+              </div>
+              <button 
+                className="btn btn-accent" 
+                onClick={() => { 
+                  setEditingSite(null); 
+                  setNewSite({ name: '', url: '', icon: '' }); 
+                  setIsModalOpen(true); 
+                }} 
+                style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+              >
+                + Add Site
+              </button>
             </div>
             <div className="col-headers">
               <div></div>
