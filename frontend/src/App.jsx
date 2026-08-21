@@ -426,15 +426,7 @@ const App = () => {
     <div className="app-container">
       <header>
         <div className="logo" style={{ display: 'flex', alignItems: 'center' }}>
-          <button 
-            className="settings-icon-btn" 
-            onClick={toggleSettings} 
-            title="Open Settings" 
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: 'var(--text)' }}
-          >
-            <Settings size={20} />
-          </button>
-          <div className="logo-circle" style={{ marginLeft: '12px' }}>
+          <div className="logo-circle">
             {customLogo ? (
               <img src={customLogo} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
@@ -442,6 +434,15 @@ const App = () => {
             )}
           </div>
           <span className="logo-text">{customName || 'Odyssey'}</span>
+        </div>
+        <div className="header-right">
+          <button 
+            className="settings-icon-btn" 
+            onClick={toggleSettings} 
+            title="Open Settings"
+          >
+            <Settings size={20} />
+          </button>
         </div>
       </header>
 
@@ -458,7 +459,29 @@ const App = () => {
         </div>
         
         <div className="drawer-split-layout">
-          {/* LEFT SIDE: Fields & Inputs */}
+          {/* LEFT SIDE: Category Sidebar Selector */}
+          <div className="drawer-sidebar">
+            <button 
+              className={`sidebar-tab-btn ${activeSettingsTab === 'general' ? 'active' : ''}`}
+              onClick={() => setActiveSettingsTab('general')}
+            >
+              General Settings
+            </button>
+            <button 
+              className={`sidebar-tab-btn ${activeSettingsTab === 'email' ? 'active' : ''}`}
+              onClick={() => setActiveSettingsTab('email')}
+            >
+              Email Alerts
+            </button>
+            <button 
+              className={`sidebar-tab-btn ${activeSettingsTab === 'ntfy' ? 'active' : ''}`}
+              onClick={() => setActiveSettingsTab('ntfy')}
+            >
+              ntfy Push Alerts
+            </button>
+          </div>
+
+          {/* RIGHT SIDE: Fields & Inputs */}
           <div className="drawer-fields-container">
             {activeSettingsTab === 'general' && (
               <div className="settings-section-fields">
@@ -647,28 +670,6 @@ const App = () => {
                 {testStatus && <div className="test-status-msg">{testStatus}</div>}
               </div>
             )}
-          </div>
-          
-          {/* RIGHT SIDE: Category Sidebar Selector */}
-          <div className="drawer-sidebar">
-            <button 
-              className={`sidebar-tab-btn ${activeSettingsTab === 'general' ? 'active' : ''}`}
-              onClick={() => setActiveSettingsTab('general')}
-            >
-              General Settings
-            </button>
-            <button 
-              className={`sidebar-tab-btn ${activeSettingsTab === 'email' ? 'active' : ''}`}
-              onClick={() => setActiveSettingsTab('email')}
-            >
-              Email Alerts
-            </button>
-            <button 
-              className={`sidebar-tab-btn ${activeSettingsTab === 'ntfy' ? 'active' : ''}`}
-              onClick={() => setActiveSettingsTab('ntfy')}
-            >
-              ntfy Push Alerts
-            </button>
           </div>
         </div>
       </div>

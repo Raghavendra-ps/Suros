@@ -413,18 +413,23 @@ header {
 }
 .outage-wrap { display: inline-block; }
 
-.settings-icon {
-  width: 36px; height: 36px;
-  border-radius: 2px;
-  border: 1.5px solid var(--border);
+.settings-icon-btn {
   background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text3);
   cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1rem;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.15s;
-  color: var(--text2);
 }
-.settings-icon:hover { border-color: var(--text); }
+.settings-icon-btn:hover {
+  background: var(--surface2);
+  color: var(--text2);
+  border-color: var(--text2);
+}
 
 /* ── Settings Drawer Slide-out ── */
 .drawer-backdrop {
@@ -499,10 +504,10 @@ header {
   overflow: hidden;
 }
 
-/* Sidebar on the right, fields on the left */
+/* Sidebar on the left, fields on the right */
 .drawer-sidebar {
   width: 180px;
-  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
   background: var(--bg);
   display: flex;
   flex-direction: column;
@@ -513,9 +518,9 @@ header {
 .sidebar-tab-btn {
   background: transparent;
   border: none;
-  border-right: 3px solid transparent;
+  border-left: 3px solid transparent;
   color: var(--text2);
-  text-align: right;
+  text-align: left;
   padding: 0.85rem 1.25rem;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 0.8rem;
@@ -532,7 +537,7 @@ header {
 .sidebar-tab-btn.active {
   background: var(--surface);
   color: var(--accent);
-  border-right-color: var(--accent);
+  border-left-color: var(--accent);
   font-weight: 600;
 }
 
