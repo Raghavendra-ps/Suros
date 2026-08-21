@@ -48,3 +48,8 @@ class Settings(Base):
     id = Column(Integer, primary_key=True, index=True)
     dashboard_name = Column(String, default="Odyssey")
     logo_url = Column(String, nullable=True)
+
+class DriveAlias(Base):
+    __tablename__ = "drive_aliases"
+    device = Column(String, primary_key=True, index=True)
+    alias = Column(String)

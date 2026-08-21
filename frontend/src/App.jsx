@@ -4,7 +4,8 @@ import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement
 import { Line } from 'react-chartjs-2';
 import {
   Trash2, Plus, Moon, Sun, Activity, RefreshCw, Pencil,
-  Server, Globe, Database, Cpu, Layers, Terminal, Box, Mail, Shield, HardDrive, Monitor, Link as LinkIcon
+  Server, Globe, Database, Cpu, Layers, Terminal, Box, Mail, Shield, HardDrive, Monitor, Link as LinkIcon,
+  Check, AlertTriangle, MoreVertical
 } from 'lucide-react';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
@@ -32,6 +33,16 @@ const App = () => {
   const [stats, setStats] = useState({ up: 0, down: 0, avg_latency: 0, overall_uptime: 0, total_outages: 0, network_latency: null, network_outages: 0, power_outages: 0, current_outage: null, connectivity_history: [] });
   const [systemMetrics, setSystemMetrics] = useState({ cpu: 0, memory: { percent: 0 }, disk: { percent: 0 }, total_storage: { total: 0, used: 0, free: 0, percent: 0 }, disks: [], uptime: 0, temp: { cpu: null, gpu: null } });
   const [systemHistory, setSystemHistory] = useState([]);
+  const [drives, setDrives] = useState([]);
+
+  const fetchDrives = async () => {
+    try {
+      const res = await axios.get('/api/drives');
+      setDrives(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error('Error fetching drives:', err);
+    }
+  };
   const [theme, setTheme] = useState(localStorage.getItem('odyssey_theme') || 'dark');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSite, setEditingSite] = useState(null);
@@ -92,7 +103,7 @@ const App = () => {
 
   useEffect(() => {
     const init = async () => {
-      await Promise.all([fetchSettings(), fetchSites(), fetchStats(), fetchSystemMetrics(), fetchSystemHistory()]);
+      await Promise.all([fetchSettings(), fetchSites(), fetchStats(), fetchSystemMetrics(), fetchSystemHistory(), fetchDrives()]);
       setIsLoading(false);
     };
     init();
@@ -101,6 +112,7 @@ const App = () => {
       fetchSites();
       fetchStats();
       fetchSystemHistory();
+      fetchDrives();
     }, 30000);
 
     const metricsInterval = setInterval(() => {
@@ -196,6 +208,17 @@ const App = () => {
       fetchSites();
     } catch (err) {
       console.error('Error deleting site:', err);
+    }
+  };
+
+  const renameDrive = async (device, currentAlias) => {
+    const newAlias = window.prompt(`Rename drive ${device}:`, currentAlias || '');
+    if (newAlias === null) return;
+    try {
+      await axios.post('/api/drives/alias', { device, alias: newAlias });
+      fetchDrives();
+    } catch (err) {
+      console.error('Error renaming drive:', err);
     }
   };
 
@@ -449,41 +472,79 @@ const App = () => {
 
       <div className="main">
         <div className="hero">
-          <div className="hero-eyebrow">✦ Live</div>
           <h1>System Metrics</h1>
         </div>
 
         <div className="panel" style={{ marginBottom: '2.5rem', padding: '1.25rem' }}>
           <div className="panel-title" style={{ marginBottom: '1rem' }}>Host Server Metrics</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem' }}>
-            <div>
-              <div className="stat-label" style={{ color: 'var(--text)' }}>CPU Usage</div>
-              <div className="latency-bar" style={{ height: '8px', margin: '8px 0' }}>
-                <div className="latency-fill" style={{ width: `${Math.round(systemMetrics.cpu)}%`, background: systemMetrics.cpu > 80 ? 'var(--down)' : 'var(--up)' }}></div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
+            {/* Column 1: CPU Metrics */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <div className="stat-label" style={{ color: 'var(--text)' }}>CPU Usage</div>
+                <div className="latency-bar" style={{ height: '8px', margin: '8px 0' }}>
+                  <div className="latency-fill" style={{ width: `${Math.round(systemMetrics.cpu)}%`, background: systemMetrics.cpu > 80 ? 'var(--down)' : 'var(--up)' }}></div>
+                </div>
+                <div className="stat-value" style={{ fontSize: '1.2rem' }}>{Math.round(systemMetrics.cpu)}%</div>
               </div>
-              <div className="stat-value" style={{ fontSize: '1.2rem' }}>{Math.round(systemMetrics.cpu)}%</div>
+              <div>
+                <div className="stat-label" style={{ color: 'var(--text3)' }}>CPU Pressure</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                  <span className={`badge ${systemMetrics.cpu > 80 ? 'offline' : systemMetrics.cpu > 50 ? 'degraded' : 'online'}`} style={{ fontSize: '0.65rem' }}>
+                    {systemMetrics.cpu > 80 ? 'High' : systemMetrics.cpu > 50 ? 'Moderate' : 'Low'}
+                  </span>
+                  <span style={{ fontSize: '0.75rem', fontFamily: 'DM Mono', color: 'var(--text2)' }}>
+                    {systemMetrics.cpu > 80 ? 'Throttling Risk' : 'Optimal'}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div>
-              <div className="stat-label" style={{ color: 'var(--text)' }}>RAM Usage</div>
-              <div className="latency-bar" style={{ height: '8px', margin: '8px 0' }}>
-                <div className="latency-fill" style={{ width: `${Math.round(systemMetrics.memory.percent)}%`, background: systemMetrics.memory.percent > 80 ? 'var(--down)' : 'var(--up)' }}></div>
+
+            {/* Column 2: Memory Metrics */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <div className="stat-label" style={{ color: 'var(--text)' }}>RAM Usage</div>
+                <div className="latency-bar" style={{ height: '8px', margin: '8px 0' }}>
+                  <div className="latency-fill" style={{ width: `${Math.round(systemMetrics.memory.percent)}%`, background: systemMetrics.memory.percent > 80 ? 'var(--down)' : 'var(--up)' }}></div>
+                </div>
+                <div className="stat-value" style={{ fontSize: '1.2rem' }}>{Math.round(systemMetrics.memory.percent)}%</div>
               </div>
-              <div className="stat-value" style={{ fontSize: '1.2rem' }}>{Math.round(systemMetrics.memory.percent)}%</div>
+              <div>
+                <div className="stat-label" style={{ color: 'var(--text3)' }}>Memory Pressure</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                  <span className={`badge ${systemMetrics.memory.percent > 80 ? 'offline' : systemMetrics.memory.percent > 60 ? 'degraded' : 'online'}`} style={{ fontSize: '0.65rem' }}>
+                    {systemMetrics.memory.percent > 80 ? 'High' : systemMetrics.memory.percent > 60 ? 'Moderate' : 'Low'}
+                  </span>
+                  <span style={{ fontSize: '0.75rem', fontFamily: 'DM Mono', color: 'var(--text2)' }}>
+                    {systemMetrics.memory.percent > 80 ? 'High Swapping' : 'Optimal'}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div>
-              <div className="stat-label" style={{ color: 'var(--text)' }}>Disk Usage</div>
-              <div className="latency-bar" style={{ height: '8px', margin: '8px 0' }}>
-                <div className="latency-fill" style={{ width: `${Math.round(systemMetrics.disk.percent)}%`, background: systemMetrics.disk.percent > 80 ? 'var(--down)' : 'var(--up)' }}></div>
+
+            {/* Column 3: Storage & GPU Metrics */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <div className="stat-label" style={{ color: 'var(--text)' }}>Storage</div>
+                <div className="storage-wrap" style={{ width: '100%' }}>
+                  <div className="storage-bar-container" style={{ marginTop: '6px', marginBottom: '6px', height: '12px' }}>
+                    <div className="storage-bar" style={{ width: `${systemMetrics.total_storage?.percent || 0}%`, backgroundColor: systemMetrics.total_storage?.percent < 80 ? 'var(--up)' : systemMetrics.total_storage?.percent < 90 ? 'var(--slow)' : 'var(--down)' }}></div>
+                  </div>
+                  <div className="storage-metric" style={{ fontSize: '0.9rem', display: 'flex', gap: '4px', alignItems: 'baseline', marginTop: '4px' }}>
+                    <span className="storage-used" style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>{systemMetrics.total_storage?.used || 0}</span>
+                    <span className="storage-sep">/</span>
+                    <span className="storage-total" style={{ fontSize: '0.85rem' }}>{systemMetrics.total_storage?.total || 0}</span>
+                    <span className="storage-unit" style={{ fontSize: '0.65rem' }}>GB ({systemMetrics.total_storage?.percent || 0}%)</span>
+                  </div>
+                </div>
               </div>
-              <div className="stat-value" style={{ fontSize: '1.2rem' }}>{Math.round(systemMetrics.disk.percent)}%</div>
-            </div>
-            <div>
-              <div className="stat-label" style={{ color: 'var(--text)' }}>GPU Usage</div>
-              <div className="latency-bar" style={{ height: '8px', margin: '8px 0' }}>
-                <div className="latency-fill" style={{ width: `${Math.round(systemMetrics.gpu?.util || 0)}%`, background: (systemMetrics.gpu?.util || 0) > 80 ? 'var(--down)' : 'var(--up)' }}></div>
+              <div>
+                <div className="stat-label" style={{ color: 'var(--text)' }}>GPU Usage</div>
+                <div className="latency-bar" style={{ height: '8px', margin: '8px 0' }}>
+                  <div className="latency-fill" style={{ width: `${Math.round(systemMetrics.gpu?.util || 0)}%`, background: (systemMetrics.gpu?.util || 0) > 80 ? 'var(--down)' : 'var(--up)' }}></div>
+                </div>
+                <div className="stat-value" style={{ fontSize: '1.2rem' }}>{systemMetrics.gpu ? `${Math.round(systemMetrics.gpu.util)}%` : 'N/A'}</div>
               </div>
-              <div className="stat-value" style={{ fontSize: '1.2rem' }}>{systemMetrics.gpu ? `${Math.round(systemMetrics.gpu.util)}%` : 'N/A'}</div>
-              {systemMetrics.gpu && <div className="stat-sub" style={{ fontSize: '0.6rem' }}>{systemMetrics.gpu.memory.used}/{systemMetrics.gpu.memory.total} GB</div>}
             </div>
           </div>
         </div>
@@ -562,29 +623,6 @@ const App = () => {
               <text x="100" y="115" textAnchor="middle" fontFamily="Syne,sans-serif" fontSize="22" fontWeight="800" fill="var(--text)">{stats.network_latency ? `${stats.network_latency}ms` : 'OFFLINE'}</text>
               <text x="100" y="130" textAnchor="middle" fontFamily="DM Moto,sans-serif" fontSize="8" fill="var(--text2)">1.1.1.1</text>
             </svg>
-          </div>
-          <div className="dial-card">
-            <div className="dial-label">Storage</div>
-            <div className="storage-wrap">
-              <div className="storage-bar-container">
-                <div className="storage-bar" style={{ width: `${systemMetrics.total_storage?.percent || 0}%`, backgroundColor: systemMetrics.total_storage?.percent < 80 ? 'var(--up)' : systemMetrics.total_storage?.percent < 90 ? 'var(--slow)' : 'var(--down)' }}></div>
-              </div>
-              <div className="storage-metric">
-                <span className="storage-used">{systemMetrics.total_storage?.used || 0}</span>
-                <span className="storage-sep"> / </span>
-                <span className="storage-total">{systemMetrics.total_storage?.total || 0}</span>
-                <span className="storage-unit">GB</span>
-              </div>
-              <div className="storage-tooltip">
-                {systemMetrics.disks?.map((disk, i) => {
-                  return (
-                    <div key={i}>
-                      {disk.device} | {disk.total}GB | {disk.mountpoint} | {disk.used}GB ({disk.percent}%)
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
           </div>
         </div>
 
@@ -720,6 +758,69 @@ const App = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Drives Monitoring Section */}
+        <div className="hero" style={{ marginTop: '3rem' }}>
+          <h1>Drives Monitoring</h1>
+        </div>
+
+        <div className="drives-grid">
+          {drives.map((drive, idx) => (
+            <div key={idx} className={`drive-card ${drive.status.toLowerCase() === 'failed' ? 'failed' : ''}`}>
+              <div className="drive-header-row">
+                <div className="drive-title-area">
+                  <div className="drive-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>{drive.device} - {drive.model}</span>
+                    <button 
+                      onClick={() => renameDrive(drive.device, drive.model)} 
+                      className="drive-rename-btn"
+                      title="Rename Drive"
+                    >
+                      <Pencil size={11} />
+                    </button>
+                  </div>
+                  <div className="drive-updated">
+                    Last Updated on {drive.last_updated}
+                  </div>
+                </div>
+                <button className="drive-menu-btn" title="More Options">
+                  <MoreVertical size={16} />
+                </button>
+              </div>
+              
+              <div className="drive-body-row">
+                <div className="drive-metrics-grid">
+                  <div className="drive-metric-col">
+                    <span className="drive-metric-label">S.M.A.R.T</span>
+                    <span className="drive-metric-value">{drive.status}</span>
+                  </div>
+                  <div className="drive-metric-col">
+                    <span className="drive-metric-label">Temperature</span>
+                    <span className="drive-metric-value">
+                      {drive.temperature !== null && drive.temperature !== undefined ? `${drive.temperature}°C` : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="drive-metric-col">
+                    <span className="drive-metric-label">Capacity</span>
+                    <span className="drive-metric-value">{drive.capacity}</span>
+                  </div>
+                  <div className="drive-metric-col">
+                    <span className="drive-metric-label">Powered On</span>
+                    <span className="drive-metric-value">{drive.powered_on}</span>
+                  </div>
+                </div>
+                
+                <div className="drive-status-icon-wrapper">
+                  {drive.status.toLowerCase() === 'failed' ? (
+                    <AlertTriangle size={20} strokeWidth={2.5} fill="rgba(200, 75, 47, 0.1)" />
+                  ) : (
+                    <Check size={20} strokeWidth={3} />
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

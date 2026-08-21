@@ -204,7 +204,7 @@ header {
 /* ── Dials ── */
 .dials-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 1rem;
   margin-bottom: 2rem;
 }
@@ -778,4 +778,168 @@ canvas { width: 100% !important; }
     .hero h1 { font-size: 2rem; }
     .summary-row { grid-template-columns: 1fr; }
     .panel { padding: 1rem; }
+}
+
+/* ── Drives Monitoring ── */
+.drives-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+}
+
+.drive-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 5px solid var(--up);
+  border-radius: 4px;
+  padding: 1.25rem 1.5rem;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 140px;
+  box-shadow: 0 4px 6px var(--shadow);
+  transition: transform 0.2s, border-color 0.2s;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.drive-card.failed {
+  border-left-color: var(--down);
+}
+
+.drive-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--text2);
+}
+
+.drive-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.drive-title-area {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.drive-title {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--up);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.drive-card.failed .drive-title {
+  color: var(--down);
+}
+
+.drive-updated {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.65rem;
+  font-weight: 300;
+  color: var(--up);
+  opacity: 0.85;
+}
+
+.drive-card.failed .drive-updated {
+  color: var(--down);
+}
+
+.drive-menu-btn {
+  background: transparent;
+  border: none;
+  color: var(--text2);
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background 0.15s;
+}
+
+.drive-menu-btn:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.drive-body-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+}
+
+.drive-metrics-grid {
+  display: flex;
+  gap: 2.5rem;
+  flex: 1;
+}
+
+.drive-metric-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.drive-metric-label {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.58rem;
+  font-weight: 300;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text3);
+}
+
+.drive-metric-value {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 1.25rem;
+  font-weight: 300;
+  color: var(--text);
+}
+
+.drive-status-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(47, 168, 126, 0.1);
+  color: var(--up);
+  flex-shrink: 0;
+}
+
+.drive-card.failed .drive-status-icon-wrapper {
+  background: rgba(200, 75, 47, 0.1);
+  color: var(--down);
+}
+
+.drive-rename-btn {
+  background: transparent;
+  border: none;
+  color: var(--text3);
+  cursor: pointer;
+  padding: 2px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 3px;
+  transition: all 0.15s;
+}
+
+.drive-rename-btn:hover {
+  background: var(--surface2);
+  color: var(--text2);
+}
+
+@media (max-width: 1024px) {
+  .drives-grid {
+    grid-template-columns: 1fr;
+  }
 }
