@@ -215,23 +215,50 @@ async def send_email_alert(settings, subject, body):
         )
 
 async def send_ntfy_alert(settings, title, message):
-    if not settings.ntfy_topic:
-        return False, "Missing ntfy topic"
-        
-    url = f"{settings.ntfy_url.rstrip('/')}/{settings.ntfy_topic}"
+    topic = (settings.ntfy_topic or '').strip()
+    base_url = (settings.ntfy_url or 'https://ntfy.sh').strip().rstrip('/')
+    if not base_url:
+        base_url = 'https://ntfy.sh'
+
+    # Smart URL construction:
+    # If ntfy_url already has a path beyond the host (e.g. https://ntfy.sh/mytopic),
+    # use it directly. Only append topic if URL is just the base server.
+    from urllib.parse import urlparse
+    parsed = urlparse(base_url)
+    url_path = parsed.path.strip('/')
+
+    if url_path:
+        # URL already has a path — use as-is (topic embedded in URL)
+        url = base_url
+        # But if topic is set AND different from the URL path, append it
+        if topic and topic.lower() != url_path.lower():
+            url = f"{base_url}/{topic}"
+    elif topic:
+        # URL is just a host, append topic
+        url = f"{base_url}/{topic}"
+    else:
+        return False, "Missing ntfy topic — enter the topic name in the Topic field"
+
+    logger.info(f"ntfy: posting to {url}")
+
     headers = {
-        "Title": title
+        "Title": title,
+        "Content-Type": "text/plain",
+        "Tags": "bell",
+        "Priority": "default",
     }
     if settings.ntfy_token:
-        headers["Authorization"] = f"Bearer {settings.ntfy_token}"
-        
+        headers["Authorization"] = f"Bearer {settings.ntfy_token.strip()}"
+
     try:
         async with httpx.AsyncClient() as client:
-            resp = await client.post(url, content=message, headers=headers, timeout=5.0)
+            resp = await client.post(url, content=message.encode('utf-8'), headers=headers, timeout=10.0)
+            logger.info(f"ntfy response: {resp.status_code} — {resp.text[:200]}")
             if resp.status_code >= 200 and resp.status_code < 300:
                 return True, None
             return False, resp.text
     except Exception as e:
+        logger.error(f"ntfy exception: {e}")
         return False, str(e)
 
 async def trigger_system_alert(title: str, message: str):
