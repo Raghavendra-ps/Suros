@@ -374,7 +374,7 @@ const App = () => {
     labels: safeSystemHistory.map(h => h ? new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' }) : ''),
     datasets: [{
       label: 'GPU %',
-      data: safeSystemHistory.map(h => h ? h.gpu : 0),
+      data: safeSystemHistory.map(h => (h && h.gpu !== null && h.gpu !== undefined) ? h.gpu : 0),
       borderColor: '#2fa87e',
       backgroundColor: 'rgba(47,168,126,0.07)',
       borderWidth: 2,
@@ -893,23 +893,30 @@ const App = () => {
 
           {/* Bento Card 8: Server Outages (Including Avg Latency & Response Time Graph) - span-12 */}
           <div className="stat-card neutral span-12" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.25rem', maxHeight: '160px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '100%', gap: '2rem' }}>
-              {/* Left: Server Outages */}
-              <div style={{ minWidth: '130px' }}>
-                <div className="stat-label" style={{ color: 'var(--text2)' }}>Server Outages</div>
-                <div className="stat-value" style={{ fontSize: '1.8rem', fontWeight: '800', lineHeight: 1.2 }}>
-                  {(stats.network_outages || 0) + (stats.power_outages || 0)}
-                </div>
-                <div style={{ display: 'flex', gap: '10px', fontSize: '0.58rem', color: 'var(--text2)', fontFamily: 'DM Mono', marginTop: '4px' }}>
-                  <span>Net: {stats.network_outages || 0}</span>
-                  <span>Power: {stats.power_outages || 0}</span>
-                </div>
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
+              
+              {/* Aligned Headers Row */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: '8px' }}>
+                <div style={{ minWidth: '130px' }} className="stat-label">Server Outages</div>
+                <div style={{ flex: 1, paddingLeft: '1.5rem' }} className="stat-label">Response Time</div>
+                <div style={{ minWidth: '130px', textAlign: 'right' }} className="stat-label">Avg Latency</div>
               </div>
 
-              {/* Middle: Response Time Chart */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100px', alignSelf: 'stretch', justifyContent: 'space-between' }}>
-                <div className="stat-label" style={{ fontSize: '0.62rem', letterSpacing: '0.05em', color: 'var(--text2)', marginBottom: '4px' }}>Response Time</div>
-                <div style={{ flex: 1, minHeight: 0 }}>
+              {/* Content Row */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flex: 1, width: '100%', gap: '2rem' }}>
+                {/* Left Content */}
+                <div style={{ minWidth: '130px' }}>
+                  <div className="stat-value" style={{ fontSize: '1.8rem', fontWeight: '800', lineHeight: 1 }}>
+                    {(stats.network_outages || 0) + (stats.power_outages || 0)}
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', fontSize: '0.58rem', color: 'var(--text2)', fontFamily: 'DM Mono', marginTop: '6px' }}>
+                    <span>Net: {stats.network_outages || 0}</span>
+                    <span>Power: {stats.power_outages || 0}</span>
+                  </div>
+                </div>
+
+                {/* Middle Content: Chart */}
+                <div style={{ flex: 1, height: '70px', alignSelf: 'stretch' }}>
                   <Line
                     data={chartData}
                     options={{
@@ -932,15 +939,15 @@ const App = () => {
                     }}
                   />
                 </div>
-              </div>
 
-              {/* Right: Avg Latency */}
-              <div style={{ textAlign: 'right', minWidth: '130px' }}>
-                <div className="stat-label" style={{ color: 'var(--text2)' }}>Avg Latency</div>
-                <div className="stat-value" style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--accent)', lineHeight: 1.2 }}>
-                  {formatLatency(stats.avg_latency)}
+                {/* Right Content */}
+                <div style={{ textAlign: 'right', minWidth: '130px' }}>
+                  <div className="stat-value" style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--accent)', lineHeight: 1 }}>
+                    {formatLatency(stats.avg_latency)}
+                  </div>
                 </div>
               </div>
+
             </div>
           </div>
 
