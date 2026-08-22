@@ -637,7 +637,7 @@ const App = () => {
               <span>CPU Metrics</span>
               <span style={{ fontSize: '0.65rem', color: 'var(--text2)', fontFamily: 'DM Mono' }}>{systemMetrics.cpu_name || 'Detecting CPU...'}</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '160px 1.2fr 3.8fr', gap: '2rem', alignItems: 'center' }}>
+            <div className="cpu-metrics-inner" style={{ display: 'grid', gridTemplateColumns: '160px 1.2fr 3.8fr', gap: '2rem', alignItems: 'center' }}>
 
               <div className="cpu-gauge-wrap">
                 <svg className="cpu-gauge-svg" viewBox="0 0 200 115" width="150" height="86">
@@ -770,7 +770,7 @@ const App = () => {
           </div>
 
           {/* Card 8: Server Outages + Response Time + Avg Latency */}
-          <div className="stat-card neutral span-12" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.25rem', maxHeight: '160px' }}>
+          <div className="stat-card neutral span-12 response-time-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.25rem', maxHeight: '160px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: '8px' }}>
