@@ -487,18 +487,20 @@ const App = () => {
     <div className="app-container">
       <header>
         <div className="logo" style={{ display: 'flex', alignItems: 'center' }}>
-          <img src={theme === 'dark' ? '/suros-logo-dark.png' : '/suros-logo-light.png'} style={{ height: '24px', width: 'auto', objectFit: 'contain' }} alt="Suros Logo" />
+          <img src={theme === 'dark' ? '/suros-logo-dark.png' : '/suros-logo-light.png'} style={{ height: '32px', width: 'auto', objectFit: 'contain' }} alt="Suros Logo" />
           <span className="suros-title-text" style={{
             fontFamily: "'Syne', sans-serif",
-            fontWeight: 900,
-            fontSize: '1.7rem',
-            letterSpacing: '-0.02em',
+            fontWeight: 800,
+            fontSize: '1.9rem',
+            letterSpacing: '-0.04em',
             textTransform: 'uppercase',
             display: 'inline-block',
-            transform: 'scaleY(0.8) scaleX(1.35)',
+            transform: 'scaleX(1.2) scaleY(0.95)',
+            transformOrigin: 'left center',
             lineHeight: 1,
             color: theme === 'dark' ? '#ff3333' : '#000000',
-            marginLeft: '12px'
+            marginLeft: '14px',
+            verticalAlign: 'middle'
           }}>SUROS</span>
         </div>
         <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
