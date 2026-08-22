@@ -996,8 +996,9 @@ canvas { width: 100% !important; }
 }
 
 .drive-metrics-grid {
-  display: flex;
-  gap: 2.5rem;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
   flex: 1;
 }
 

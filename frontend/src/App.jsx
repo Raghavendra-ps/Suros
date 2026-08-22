@@ -81,31 +81,7 @@ const App = () => {
   const [draftSettings, setDraftSettings] = useState({});
   const [saveStatus, setSaveStatus] = useState(null);
 
-  // Dynamic favicon switcher based on theme mode
-  useEffect(() => {
-    const suffix = theme === 'dark' ? 'Dark' : 'Light';
-    
-    const updateLink = (rel, href, attributes = {}) => {
-      let link = document.querySelector(`link[rel="${rel}"]:not([sizes])`);
-      if (attributes.sizes) {
-        link = document.querySelector(`link[rel="${rel}"][sizes="${attributes.sizes}"]`);
-      }
-      if (!link) {
-        link = document.createElement('link');
-        link.rel = rel;
-        for (const [key, val] of Object.entries(attributes)) {
-          link.setAttribute(key, val);
-        }
-        document.head.appendChild(link);
-      }
-      link.href = href;
-    };
 
-    updateLink('icon', `/Suros-${suffix}/favicon.ico`);
-    updateLink('apple-touch-icon', `/Suros-${suffix}/apple-touch-icon.png`);
-    updateLink('icon', `/Suros-${suffix}/favicon-32x32.png`, { sizes: '32x32', type: 'image/png' });
-    updateLink('icon', `/Suros-${suffix}/favicon-16x16.png`, { sizes: '16x16', type: 'image/png' });
-  }, [theme]);
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
   const [renameDevice, setRenameDevice] = useState('');
   const [renameVal, setRenameVal] = useState('');
@@ -512,7 +488,18 @@ const App = () => {
       <header>
         <div className="logo" style={{ display: 'flex', alignItems: 'center' }}>
           <img src={theme === 'dark' ? '/suros-logo-dark.png' : '/suros-logo-light.png'} style={{ height: '24px', width: 'auto', objectFit: 'contain' }} alt="Suros Logo" />
-          <img src={theme === 'dark' ? '/suros-dark.png' : '/suros-light.png'} style={{ height: '16px', width: 'auto', objectFit: 'contain', marginLeft: '10px' }} alt="Suros" />
+          <span className="suros-title-text" style={{
+            fontFamily: "'Syne', sans-serif",
+            fontWeight: 900,
+            fontSize: '1.7rem',
+            letterSpacing: '-0.02em',
+            textTransform: 'uppercase',
+            display: 'inline-block',
+            transform: 'scaleY(0.8) scaleX(1.35)',
+            lineHeight: 1,
+            color: theme === 'dark' ? '#ff3333' : '#000000',
+            marginLeft: '12px'
+          }}>SUROS</span>
         </div>
         <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
           <button className="theme-toggle-btn" onClick={toggleTheme} title="Toggle Theme" style={{ background: 'none', border: 'none', color: 'var(--text2)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}>
@@ -933,6 +920,7 @@ const App = () => {
                   </div>
                 </div>
                 <div style={{ height: '40px', marginTop: '6px' }}>
+                  <div className="stat-label" style={{ fontSize: '0.55rem', textTransform: 'uppercase', marginBottom: '2px', opacity: 0.8 }}>Connectivity History</div>
                   <Line
                     data={connectivityChartData}
                     options={{
@@ -952,8 +940,7 @@ const App = () => {
               {/* Right Column: Response Time Trend Chart */}
               <div style={{ flex: '1.2', display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--border)', paddingLeft: '1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <span className="stat-label" style={{ fontSize: '0.62rem', letterSpacing: '0.05em' }}>Resp. Time Trend</span>
-                  <span style={{ fontSize: '0.55rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>last 100</span>
+                  <span className="stat-label" style={{ fontSize: '0.62rem', letterSpacing: '0.05em' }}>Response Time</span>
                 </div>
                 <div style={{ flex: 1, minHeight: 0 }}>
                   <Line
@@ -1103,11 +1090,8 @@ const App = () => {
           <div className="panel span-12">
             <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  Monitored Sites <span style={{ color: 'var(--accent)', fontSize: '0.8rem', verticalAlign: 'middle' }}>★</span>
-                </span>
-                <span className="last-check-label">
-                  <span style={{ color: '#ff4d4d', fontWeight: 'bold' }}>{sites.length}</span> sites
+                <span className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  Monitored Sites <span style={{ color: '#ff4d4d', fontWeight: 'bold', fontSize: '0.9rem', background: 'rgba(255,77,77,0.1)', padding: '2px 8px', borderRadius: '4px' }}>{sites.length}</span>
                 </span>
               </div>
               <button
