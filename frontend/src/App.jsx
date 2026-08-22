@@ -370,6 +370,20 @@ const App = () => {
     }]
   };
 
+  const gpuChartData = {
+    labels: safeSystemHistory.map(h => h ? new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' }) : ''),
+    datasets: [{
+      label: 'GPU %',
+      data: safeSystemHistory.map(h => h ? h.gpu : 0),
+      borderColor: '#2fa87e',
+      backgroundColor: 'rgba(47,168,126,0.07)',
+      borderWidth: 2,
+      pointRadius: 0,
+      tension: 0.3,
+      fill: true,
+    }]
+  };
+
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
