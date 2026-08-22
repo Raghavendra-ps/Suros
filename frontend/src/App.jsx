@@ -1151,20 +1151,20 @@ const App = () => {
           </div>
 
           {/* Right Column (span-4) containing Response Time and Active Processes */}
-          <div className="span-4" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="span-4" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: '100%', minHeight: '100%' }}>
             {/* Response Time Trend — fixed height, never grows */}
-            <div className="panel" style={{ margin: 0, flexShrink: 0 }}>
+            <div className="panel" style={{ margin: 0, height: '170px', display: 'flex', flexDirection: 'column' }}>
               <div className="panel-header">
                 <span className="panel-title">Response Time Trend</span>
                 <span className="last-check-label">last 100 checks</span>
               </div>
-              <div className="chart-wrap" style={{ height: '120px' }}>
+              <div className="chart-wrap" style={{ flex: 1, minHeight: 0 }}>
                 <Line data={chartData} options={chartOptions} />
               </div>
             </div>
 
-            {/* Active Processes — fixed height, scrollable inside */}
-            <div className="panel" style={{ margin: 0, height: '340px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {/* Active Processes — fills remaining height */}
+            <div className="panel" style={{ margin: 0, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: '280px' }}>
               <div className="panel-header" style={{ padding: '1.25rem 1.25rem 0.5rem 1.25rem', borderBottom: 'none' }}>
                 <span className="panel-title">Active Processes</span>
               </div>
