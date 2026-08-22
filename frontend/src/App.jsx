@@ -875,64 +875,36 @@ const App = () => {
             </div>
           </div>
 
-          {/* Bento Card 8: Server Outages (Including Avg Latency, Connectivity & Response Time Trend Graph) - span-12 */}
-          <div className="stat-card neutral span-12" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.25rem' }}>
-            <div style={{ display: 'flex', gap: '1.5rem', height: '100%' }}>
-              {/* Left Column: Stats & Sparkline */}
-              <div style={{ flex: '1', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <div className="stat-label">Server Outages</div>
-                      <div className="stat-value" style={{ fontSize: '1.4rem', fontWeight: '800', lineHeight: 1.2 }}>
-                        {(stats.network_outages || 0) + (stats.power_outages || 0)}
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div className="stat-label">Avg Latency</div>
-                      <div className="stat-value" style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--accent)', lineHeight: 1.2 }}>
-                        {formatLatency(stats.avg_latency)}
-                      </div>
+          {/* Bento Card 8: Server Outages (Including Avg Latency & Response Time Graph) - span-4 */}
+          <div className="stat-card neutral span-4" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.25rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div className="stat-label">Server Outages</div>
+                    <div className="stat-value" style={{ fontSize: '1.4rem', fontWeight: '800', lineHeight: 1.2 }}>
+                      {(stats.network_outages || 0) + (stats.power_outages || 0)}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '10px', fontSize: '0.58rem', color: 'var(--text3)', fontFamily: 'DM Mono', marginTop: '4px' }}>
-                    <span>Net: {stats.network_outages || 0}</span>
-                    <span>Power: {stats.power_outages || 0}</span>
+                  <div style={{ textAlign: 'right' }}>
+                    <div className="stat-label">Avg Latency</div>
+                    <div className="stat-value" style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--accent)', lineHeight: 1.2 }}>
+                      {formatLatency(stats.avg_latency)}
+                    </div>
                   </div>
                 </div>
-                <div style={{ height: '55px', marginTop: '6px' }}>
-                  <div className="stat-label" style={{ fontSize: '0.55rem', textTransform: 'uppercase', marginBottom: '2px', opacity: 0.8 }}>Connectivity History</div>
-                  <Line
-                    data={connectivityChartData}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: { legend: { display: false }, tooltip: { enabled: false } },
-                      scales: {
-                        x: { display: false },
-                        y: {
-                          display: true,
-                          grid: { display: false },
-                          ticks: {
-                            color: 'var(--text3)',
-                            font: { size: 7, family: 'DM Mono' },
-                            stepSize: 1,
-                            callback: (val) => val === 1 ? 'UP' : val === 0 ? 'DN' : ''
-                          }
-                        }
-                      },
-                      animation: { duration: 300 }
-                    }}
-                  />
+                <div style={{ display: 'flex', gap: '10px', fontSize: '0.58rem', color: 'var(--text3)', fontFamily: 'DM Mono', marginTop: '4px' }}>
+                  <span>Net: {stats.network_outages || 0}</span>
+                  <span>Power: {stats.power_outages || 0}</span>
                 </div>
               </div>
               
-              {/* Right Column: Response Time Trend Chart */}
-              <div style={{ flex: '1.4', display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--border)', paddingLeft: '1.5rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+              {/* Response Time Chart (in middle) */}
+              <div style={{ display: 'flex', flexDirection: 'column', marginTop: '10px', flex: 1, minHeight: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
                   <span className="stat-label" style={{ fontSize: '0.62rem', letterSpacing: '0.05em' }}>Response Time</span>
                 </div>
-                <div style={{ flex: 1, minHeight: 0 }}>
+                <div style={{ flex: 1, minHeight: '60px' }}>
                   <Line
                     data={chartData}
                     options={{

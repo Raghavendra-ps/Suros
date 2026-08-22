@@ -967,6 +967,42 @@ def get_system_history(db: Session = Depends(get_db)):
 
 LAST_NET_IO = {"rx": 0, "tx": 0, "time": 0.0}
 
+def get_host_partitions():
+    partitions = []
+    # Try reading host's mounts file if available
+    for mounts_path in ["/mnt/host/proc/mounts", "/mnt/host/etc/mtab"]:
+        if os.path.exists(mounts_path):
+            try:
+                with open(mounts_path, "r") as f:
+                    for line in f:
+                        parts = line.split()
+                        if len(parts) >= 3:
+                            device, mountpoint, fstype = parts[0], parts[1], parts[2]
+                            if not device.startswith("/dev/"):
+                                continue
+                            if fstype in ('squashfs', 'tmpfs', 'devtmpfs', 'overlay', 'proc', 'sysfs', 'devpts'):
+                                continue
+                            partitions.append({
+                                "device": device,
+                                "mountpoint": mountpoint,
+                                "fstype": fstype
+                            })
+                return partitions
+            except Exception:
+                pass
+    
+    # Fallback to container disk partitions
+    try:
+        for p in psutil.disk_partitions():
+            partitions.append({
+                "device": p.device,
+                "mountpoint": p.mountpoint,
+                "fstype": p.fstype
+            })
+    except Exception:
+        pass
+    return partitions
+
 @app.get("/api/system-metrics")
 def get_system_metrics():
     global LAST_NET_IO
@@ -996,44 +1032,34 @@ def get_system_metrics():
         disks = []
         seen_devices = set()
         
-        try:
-            for partition in psutil.disk_partitions():
-                try:
-                    # Skip pseudo filesystems and very small partitions
-                    if partition.fstype in ('squashfs', 'tmpfs', 'devtmpfs', 'overlay', 'proc', 'sysfs', 'devpts'):
-                        continue
-                    
-                    usage = get_host_disk_usage(partition.mountpoint)
-                    if usage.total < 1024 * 1024 * 1024:  # Skip partitions < 1GB
-                        continue
-                    
-                    # Extract device name (e.g., sda2 from /dev/sda2)
-                    device_name = partition.device.split('/')[-1] if partition.device else ''
-                    
-                    # Skip if we've already seen this device
-                    if device_name and device_name in seen_devices:
-                        continue
-                    if device_name:
-                        seen_devices.add(device_name)
-                    
-                    # Skip container-specific paths
-                    mountpoint = partition.mountpoint
-                    if any(x in mountpoint for x in ['/var/lib/docker', '/etc/resolv.conf', '/etc/hostname', '/etc/hosts', '/proc', '/sys', '/dev']):
-                        continue
-                    
-                    disks.append({
-                        "device": device_name,
-                        "mountpoint": mountpoint,
-                        "fstype": partition.fstype,
-                        "total": round(usage.total / (1024 ** 3), 2),
-                        "used": round(usage.used / (1024 ** 3), 2),
-                        "free": round(usage.free / (1024 ** 3), 2),
-                        "percent": usage.percent
-                    })
-                except (PermissionError, FileNotFoundError, OSError, KeyError):
-                    pass
-        except Exception:
-            pass
+        for part in get_host_partitions():
+            try:
+                device_name = part["device"].split('/')[-1] if part["device"] else ''
+                if device_name and device_name in seen_devices:
+                    continue
+                if device_name:
+                    seen_devices.add(device_name)
+                
+                # Query usage from host path prefix
+                mountpoint = part["mountpoint"]
+                if any(x in mountpoint for x in ['/var/lib/docker', '/etc/resolv.conf', '/etc/hostname', '/etc/hosts', '/proc', '/sys', '/dev']):
+                    continue
+                
+                usage = get_host_disk_usage(mountpoint)
+                if usage.total < 1024 * 1024 * 1024:  # Skip partitions < 1GB
+                    continue
+                
+                disks.append({
+                    "device": device_name,
+                    "mountpoint": mountpoint,
+                    "fstype": part["fstype"],
+                    "total": round(usage.total / (1024 ** 3), 2),
+                    "used": round(usage.used / (1024 ** 3), 2),
+                    "free": round(usage.free / (1024 ** 3), 2),
+                    "percent": usage.percent
+                })
+            except Exception:
+                pass
         
         # Calculate total storage
         total_storage = sum(d["total"] for d in disks)
