@@ -10,6 +10,14 @@ services:
       - /:/mnt/host:ro
     restart: always
     privileged: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
 
   frontend:
     build: ./frontend

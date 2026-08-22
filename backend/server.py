@@ -592,16 +592,30 @@ def get_gpu_metrics():
             for line in lines:
                 parts = [p.strip() for p in line.split(',')]
                 if len(parts) == 4:
+                    # Older GPUs may return "[N/A]" or "N/A" for utilization/temp
+                    util_str = parts[0].replace("[", "").replace("]", "").strip()
+                    util = int(util_str) if util_str.isdigit() else 0
+                    
+                    mem_used_str = parts[1].replace("[", "").replace("]", "").strip()
+                    mem_used = int(mem_used_str) if mem_used_str.isdigit() else 0
+                    
+                    mem_total_str = parts[2].replace("[", "").replace("]", "").strip()
+                    mem_total = int(mem_total_str) if mem_total_str.isdigit() else 0
+                    
+                    temp_str = parts[3].replace("[", "").replace("]", "").strip()
+                    temp = int(temp_str) if temp_str.isdigit() else None
+                    
                     results.append({
-                        "util": int(parts[0]),
+                        "util": util,
                         "memory": {
-                            "used": round(int(parts[1]) / 1024, 2),
-                            "total": round(int(parts[2]) / 1024, 2)
+                            "used": round(mem_used / 1024, 2),
+                            "total": round(mem_total / 1024, 2)
                         },
-                        "temp": int(parts[3])
+                        "temp": temp
                     })
             return results[0] if results else None
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error reading GPU metrics: {e}")
         return None
     return None
 
