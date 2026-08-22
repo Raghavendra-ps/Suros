@@ -76,10 +76,36 @@ const App = () => {
     ntfy_topic: '',
     ntfy_token: ''
   });
-  const [activeSettingsTab, setActiveSettingsTab] = useState('general');
+  const [activeSettingsTab, setActiveSettingsTab] = useState('email');
   const [testStatus, setTestStatus] = useState(null);
   const [draftSettings, setDraftSettings] = useState({});
   const [saveStatus, setSaveStatus] = useState(null);
+
+  // Dynamic favicon switcher based on theme mode
+  useEffect(() => {
+    const suffix = theme === 'dark' ? 'Dark' : 'Light';
+    
+    const updateLink = (rel, href, attributes = {}) => {
+      let link = document.querySelector(`link[rel="${rel}"]:not([sizes])`);
+      if (attributes.sizes) {
+        link = document.querySelector(`link[rel="${rel}"][sizes="${attributes.sizes}"]`);
+      }
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = rel;
+        for (const [key, val] of Object.entries(attributes)) {
+          link.setAttribute(key, val);
+        }
+        document.head.appendChild(link);
+      }
+      link.href = href;
+    };
+
+    updateLink('icon', `/Suros-${suffix}/favicon.ico`);
+    updateLink('apple-touch-icon', `/Suros-${suffix}/apple-touch-icon.png`);
+    updateLink('icon', `/Suros-${suffix}/favicon-32x32.png`, { sizes: '32x32', type: 'image/png' });
+    updateLink('icon', `/Suros-${suffix}/favicon-16x16.png`, { sizes: '16x16', type: 'image/png' });
+  }, [theme]);
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
   const [renameDevice, setRenameDevice] = useState('');
   const [renameVal, setRenameVal] = useState('');
@@ -485,16 +511,13 @@ const App = () => {
     <div className="app-container">
       <header>
         <div className="logo" style={{ display: 'flex', alignItems: 'center' }}>
-          <div className="logo-circle">
-            {customLogo ? (
-              <img src={customLogo} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : (
-              <img src="/Odyssey.png" alt="Odyssey" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            )}
-          </div>
-          <span className="logo-text">{customName || 'Odyssey'}</span>
+          <img src={theme === 'dark' ? '/suros-logo-dark.png' : '/suros-logo-light.png'} style={{ height: '24px', width: 'auto', objectFit: 'contain' }} alt="Suros Logo" />
+          <img src={theme === 'dark' ? '/suros-dark.png' : '/suros-light.png'} style={{ height: '16px', width: 'auto', objectFit: 'contain', marginLeft: '10px' }} alt="Suros" />
         </div>
-        <div className="header-right">
+        <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+          <button className="theme-toggle-btn" onClick={toggleTheme} title="Toggle Theme" style={{ background: 'none', border: 'none', color: 'var(--text2)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}>
+            {theme === 'dark' ? <Moon size={20} /> : <Sun size={20} />}
+          </button>
           <button
             className="settings-icon-btn"
             onClick={toggleSettings}
@@ -521,12 +544,6 @@ const App = () => {
           {/* LEFT SIDE: Category Sidebar Selector */}
           <div className="drawer-sidebar">
             <button
-              className={`sidebar-tab-btn ${activeSettingsTab === 'general' ? 'active' : ''}`}
-              onClick={() => setActiveSettingsTab('general')}
-            >
-              General Settings
-            </button>
-            <button
               className={`sidebar-tab-btn ${activeSettingsTab === 'email' ? 'active' : ''}`}
               onClick={() => setActiveSettingsTab('email')}
             >
@@ -542,52 +559,6 @@ const App = () => {
 
           {/* RIGHT SIDE: Fields & Inputs */}
           <div className="drawer-fields-container">
-            {activeSettingsTab === 'general' && (
-              <div className="settings-section-fields">
-                <h3>General Settings</h3>
-
-                <div className="form-group">
-                  <label>Dashboard Name</label>
-                  <input
-                    type="text"
-                    value={draftSettings.dashboard_name || ''}
-                    onChange={(e) => setDraftSettings({ ...draftSettings, dashboard_name: e.target.value })}
-                    placeholder="e.g. Odyssey Dashboard"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Logo</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '4px' }}>
-                    <div className="logo-circle" style={{ width: 36, height: 36, cursor: 'pointer' }} onClick={() => document.getElementById('logo-upload-input').click()}>
-                      {customLogo ? (
-                        <img src={customLogo} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-                      ) : (
-                        <div className="logo-circle-placeholder" style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--accent)', opacity: 0.5 }} />
-                      )}
-                    </div>
-                    <button className="btn" onClick={() => document.getElementById('logo-upload-input').click()} style={{ padding: '6px 12px', fontSize: '0.8rem' }}>Upload Image</button>
-                    <input id="logo-upload-input" type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
-                  </div>
-                </div>
-
-                <div className="form-group" style={{ marginTop: '1.5rem' }}>
-                  <div className="theme-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>Theme mode</span>
-                    <button className="theme-toggle" onClick={toggleTheme}>
-                      {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="settings-save-row">
-                  <button className="btn btn-accent" onClick={handleSaveDraft} disabled={saveStatus === 'saving'}>
-                    {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? '✓ Saved' : saveStatus === 'error' ? '✗ Error' : 'Save Changes'}
-                  </button>
-                </div>
-              </div>
-            )}
-
             {activeSettingsTab === 'email' && (
               <div className="settings-section-fields">
                 <h3>Email Outage Alerts</h3>
