@@ -27,7 +27,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[logging.StreamHandler()]
 )
-logger = logging.getLogger("odyssey-backend")
+logger = logging.getLogger("suros-backend")
 
 def get_host_disk_usage(mountpoint):
     host_path = f"/mnt/host{mountpoint}"
@@ -75,7 +75,7 @@ try:
 except Exception as e:
     logger.error(f"Database creation error: {e}")
 
-app = FastAPI(title="Odyssey Uptime Monitor API")
+app = FastAPI(title="Suros Uptime Monitor API")
 
 # Enable CORS for frontend
 app.add_middleware(
@@ -250,7 +250,7 @@ def build_html_email(subject, message):
     <body>
       <div class="container">
         <div class="header">
-          <span style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-weight: 800; font-size: 14px; color: #f2ede4;">ODYSSEY</span>
+          <span style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-weight: 800; font-size: 14px; color: #f2ede4;">Suros</span>
           <span class="badge">{status_label}</span>
         </div>
         <h2 class="title">{subject}</h2>
@@ -264,11 +264,11 @@ def build_html_email(subject, message):
           </div>
           <div class="meta-row">
             <span class="meta-label">Source</span>
-            <span>Odyssey Monitor</span>
+            <span>Suros Monitor</span>
           </div>
         </div>
         <div class="footer">
-          Odyssey Dashboard • Automated Alert System
+          Suros • Automated Alert System
         </div>
       </div>
     </body>
@@ -285,7 +285,7 @@ async def send_email_resend(api_key, recipient, subject, body):
     html_content = build_html_email(subject, body)
     
     data = {
-        "from": "Odyssey Alerts <alerts@resend.dev>",
+        "from": "Suros Alerts <alerts@resend.dev>",
         "to": recipient,
         "subject": subject,
         "html": html_content,
@@ -390,8 +390,6 @@ async def send_ntfy_alert(settings, title, message):
         # URL already has a path — use as-is (topic embedded in URL)
         url = base_url
         # But if topic is set AND different from the URL path, append it
-        if topic and topic.lower() != url_path.lower():
-            url = f"{base_url}/{topic}"
     elif topic:
         # URL is just a host, append topic
         url = f"{base_url}/{topic}"
@@ -684,7 +682,7 @@ async def monitor_sites_task():
                     current_outage_start = None
                 asyncio.create_task(trigger_system_alert(
                     "Host Network Restored",
-                    "The Odyssey host server network connection is back ONLINE."
+                    "The Suros host server network connection is back ONLINE."
                 ))
 
             if not server_online and last_network_online:
@@ -699,7 +697,7 @@ async def monitor_sites_task():
                 current_outage_start = datetime.utcnow()
                 asyncio.create_task(trigger_system_alert(
                     "Host Network Outage",
-                    "The Odyssey host server network connection is OFFLINE."
+                    "The Suros host server network connection is OFFLINE."
                 ))
 
             last_network_online = server_online
@@ -818,7 +816,7 @@ async def startup_event():
         # Initialize settings if they don't exist
         if db.query(models.Settings).count() == 0:
             logger.info("Initializing default settings...")
-            settings = models.Settings(dashboard_name="Odyssey", logo_url=None)
+            settings = models.Settings(dashboard_name="Suros", logo_url=None)
             db.add(settings)
             db.commit()
             logger.info("Settings initialized.")
@@ -1230,7 +1228,7 @@ async def upload_logo(file: UploadFile = File(...), db: Session = Depends(get_db
     # Update settings in database
     settings = db.query(models.Settings).first()
     if not settings:
-        settings = models.Settings(dashboard_name="Odyssey", logo_url=logo_url)
+        settings = models.Settings(dashboard_name="Suros", logo_url=logo_url)
         db.add(settings)
     else:
         settings.logo_url = logo_url
@@ -1254,7 +1252,7 @@ def get_settings(db: Session = Depends(get_db)):
     if not settings:
         # Create default settings
         settings = models.Settings(
-            dashboard_name="Odyssey", 
+            dashboard_name="Suros", 
             logo_url=None,
             email_enabled=0,
             email_provider="gmail",
@@ -1324,7 +1322,7 @@ async def test_notification(db: Session = Depends(get_db)):
         email_ok, email_err = await send_email_alert(
             settings,
             "Test Alert",
-            "This is a test alert notification from your Odyssey dashboard. Outage monitoring is functioning correctly!"
+            "This is a test alert notification from your Suros dashboard. Outage monitoring is functioning correctly!"
         )
         if email_ok:
             success = True
@@ -1336,7 +1334,7 @@ async def test_notification(db: Session = Depends(get_db)):
         ntfy_ok, ntfy_err = await send_ntfy_alert(
             settings,
             "Test Alert",
-            "This is a test alert notification from your Odyssey dashboard."
+            "This is a test alert notification from your Suros dashboard."
         )
         if ntfy_ok:
             success = True
