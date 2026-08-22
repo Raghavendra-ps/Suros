@@ -495,12 +495,13 @@ const App = () => {
             letterSpacing: '-0.04em',
             textTransform: 'uppercase',
             display: 'inline-block',
-            transform: 'scaleX(1.2) scaleY(0.95)',
+            transform: 'scaleX(1.3) scaleY(0.95)',
             transformOrigin: 'left center',
             lineHeight: 1,
             color: theme === 'dark' ? '#ff3333' : '#000000',
             marginLeft: '14px',
-            verticalAlign: 'middle'
+            verticalAlign: 'middle',
+            WebkitTextStroke: theme === 'dark' ? '1px #ff3333' : '1px #000000'
           }}>SUROS</span>
         </div>
         <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
