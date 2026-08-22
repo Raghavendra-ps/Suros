@@ -936,42 +936,70 @@ const App = () => {
             <div className="stat-sub">action required</div>
           </div>
 
-          {/* Bento Card 8: Server Outages (Including Avg Latency & Connectivity Graph) - span-6 */}
+          {/* Bento Card 8: Server Outages (Including Avg Latency, Connectivity & Response Time Trend Graph) - span-6 */}
           <div className="stat-card neutral span-6" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.25rem' }}>
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', gap: '1rem', height: '100%' }}>
+              {/* Left Column: Stats & Sparkline */}
+              <div style={{ flex: '1', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 <div>
-                  <div className="stat-label">Server Outages</div>
-                  <div className="stat-value" style={{ fontSize: '1.6rem', fontWeight: '800', lineHeight: 1.2 }}>
-                    {(stats.network_outages || 0) + (stats.power_outages || 0)}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <div className="stat-label">Server Outages</div>
+                      <div className="stat-value" style={{ fontSize: '1.4rem', fontWeight: '800', lineHeight: 1.2 }}>
+                        {(stats.network_outages || 0) + (stats.power_outages || 0)}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div className="stat-label">Avg Latency</div>
+                      <div className="stat-value" style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--accent)', lineHeight: 1.2 }}>
+                        {formatLatency(stats.avg_latency)}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', fontSize: '0.58rem', color: 'var(--text3)', fontFamily: 'DM Mono', marginTop: '4px' }}>
+                    <span>Net: {stats.network_outages || 0}</span>
+                    <span>Power: {stats.power_outages || 0}</span>
                   </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div className="stat-label">Avg Latency</div>
-                  <div className="stat-value" style={{ fontSize: '1.3rem', fontWeight: '800', color: 'var(--accent)', lineHeight: 1.2 }}>
-                    {formatLatency(stats.avg_latency)}
-                  </div>
+                <div style={{ height: '40px', marginTop: '6px' }}>
+                  <Line
+                    data={connectivityChartData}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                      scales: {
+                        x: { display: false },
+                        y: { display: false, min: 0, max: 1.1 }
+                      },
+                      animation: { duration: 300 }
+                    }}
+                  />
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '10px', fontSize: '0.6rem', color: 'var(--text3)', fontFamily: 'DM Mono', marginTop: '6px' }}>
-                <span>Net: {stats.network_outages || 0}</span>
-                <span>Power: {stats.power_outages || 0}</span>
+              
+              {/* Right Column: Response Time Trend Chart */}
+              <div style={{ flex: '1.2', display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--border)', paddingLeft: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <span className="stat-label" style={{ fontSize: '0.62rem', letterSpacing: '0.05em' }}>Resp. Time Trend</span>
+                  <span style={{ fontSize: '0.55rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>last 100</span>
+                </div>
+                <div style={{ flex: 1, minHeight: 0 }}>
+                  <Line
+                    data={chartData}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                      scales: {
+                        x: { display: false },
+                        y: { display: false }
+                      },
+                      animation: { duration: 300 }
+                    }}
+                  />
+                </div>
               </div>
-            </div>
-            <div style={{ height: '55px', marginTop: '8px' }}>
-              <Line
-                data={connectivityChartData}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: { legend: { display: false }, tooltip: { enabled: false } },
-                  scales: {
-                    x: { display: false },
-                    y: { display: false, min: 0, max: 1.1 }
-                  },
-                  animation: { duration: 300 }
-                }}
-              />
             </div>
           </div>
 
@@ -1058,151 +1086,138 @@ const App = () => {
             </div>
           </div>
 
-          {/* Bottom Bento Section: Left Column (span-8) + Right Column (span-4) */}
-          <div className="span-8" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            {/* Monitored Sites List */}
-            <div className="panel" style={{ margin: 0 }}>
-              <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span className="panel-title">Monitored Sites</span>
-                  <span className="last-check-label">{sites.length} sites</span>
-                </div>
-                <button
-                  className="btn btn-accent"
-                  onClick={() => {
-                    setEditingSite(null);
-                    setNewSite({ name: '', url: '', icon: '' });
-                    setIsModalOpen(true);
-                  }}
-                  style={{ padding: '4px 10px', fontSize: '0.75rem' }}
-                >
-                  + Add Site
-                </button>
-              </div>
-              <div className="col-headers">
-                <div></div>
-                <div className="col-h">Site</div>
-                <div className="col-h">Status</div>
-                <div className="col-h">Ping</div>
-                <div className="col-h">Latency</div>
-                <div className="col-h" style={{ textAlign: 'right' }}>Outages</div>
-                <div></div>
-              </div>
-              <div id="siteList">
-                {safeSites.length === 0 ? (
-                  <div className="empty-state">No sites added yet — add sites to begin.</div>
-                ) : (
-                  safeSites.map(site => site && (
-                    <div key={site.id} className="site-row clickable" onClick={() => site.url && window.open(site.url, '_blank')}>
-                      <div className={`status-dot ${site.status === 'success' ? 'online' : site.status === 'lan_up' ? 'lan' : site.status === 'slow' ? 'degraded' : 'offline'}`} title={site.status === 'lan_up' ? 'Reachable via LAN' : site.status === 'slow' ? 'Degraded' : site.status === 'success' ? 'Online' : 'Offline'}></div>
-                      <div>
-                        <div className="site-name">
-                          <Icon name={site.icon} size={18} style={{ marginRight: '8px', color: 'var(--text2)' }} />
-                          {site.name}
-                        </div>
-                        <div className="site-url">{site.url ? site.url.replace(/^https?:\/\//, '') : ''}</div>
-                        {Array.isArray(site.history) && site.history.length > 0 && (
-                          <div className="site-history-dots">
-                            {site.history.slice(-20).map((h, i) => (
-                              <div
-                                key={i}
-                                className={`history-dot ${h?.status === 'success' ? 'dot-up' :
-                                  h?.status === 'slow' ? 'dot-slow' :
-                                    h?.status === 'lan_up' ? 'dot-up' :
-                                      h ? 'dot-down' : 'dot-unknown'
-                                  }`}
-                                title={h?.status || 'unknown'}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <div className={`badge ${site.status === 'success' ? 'online' : site.status === 'lan_up' ? 'lan' : site.status === 'slow' ? 'degraded' : 'offline'}`}>
-                        {site.status === 'success' ? 'Online' : site.status === 'lan_up' ? 'LAN' : site.status === 'slow' ? 'Slow' : 'Offline'}
-                      </div>
-                      <div className="ping-val">{site.latency ? `${Math.round(site.latency)}ms` : '—'}</div>
-                      <div>
-                        <div className="latency-bar" style={site.status === 'lan_up' ? { border: '2px dotted #2fa87e', background: 'transparent' } : {}}>
-                          <div
-                            className="latency-fill"
-                            style={{
-                              width: site.status === 'lan_up' ? '0%' : `${Math.max(0, 100 - Math.min((site.latency || 0) / 30, 100))}%`,
-                              background: site.status === 'lan_up' ? 'transparent' : (site.latency || 0) >= 3000 ? 'var(--down)' : (site.latency || 0) >= 2000 ? 'var(--degraded)' : 'var(--up)',
-                              border: 'none'
-                            }}
-                          ></div>
-                        </div>
-                        <div className="latency-sub" style={{ color: (site.latency || 0) >= 3000 ? 'var(--down)' : (site.latency || 0) >= 2000 ? 'var(--degraded)' : 'var(--up)' }}>
-                          {site.latency ? (site.latency < 100 ? 'Very Fast' : site.latency < 2000 ? 'Fast' : site.latency < 3000 ? 'Slow' : 'Very Slow') : '—'}
-                        </div>
-                      </div>
-                      <div className="outage-badge" title="External outages recorded">
-                        {(site.outage_count || 0) > 0 ? `${site.outage_count} ↓` : '—'}
-                      </div>
-                      <div style={{ display: 'flex', gap: '4px' }} onClick={(e) => e.stopPropagation()}>
-                        <button className="delete-btn" onClick={() => handleEditSite(site)} title="Edit"><Pencil size={12} /></button>
-                        <button className="delete-btn" onClick={() => handleDeleteSite(site.id, site.name)} title="Remove"><Trash2 size={12} /></button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+          {/* Active Processes — Full width span-12 block directly below the charts but above sites list */}
+          <div className="panel span-12" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div className="panel-header" style={{ padding: '1.25rem 1.25rem 0.5rem 1.25rem', borderBottom: 'none' }}>
+              <span className="panel-title">Active Processes</span>
+            </div>
+            <div className="proc-list-container" style={{ overflowY: 'auto', padding: '0 1.25rem 1.25rem 1.25rem', fontSize: '0.68rem', fontFamily: 'DM Mono', maxHeight: '280px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', color: 'var(--text2)' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--text3)' }}>
+                    <th style={{ padding: '4px 0' }}>PID</th>
+                    <th>CMD</th>
+                    <th>USER</th>
+                    <th style={{ textAlign: 'right' }}>MEM</th>
+                    <th style={{ textAlign: 'right' }}>CPU</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {processes.map((proc, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid rgba(200,200,200,0.02)' }}>
+                      <td style={{ padding: '4px 0', color: 'var(--accent)' }}>{proc.pid}</td>
+                      <td style={{ maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={proc.name}>{proc.name}</td>
+                      <td>{proc.user}</td>
+                      <td style={{ textAlign: 'right' }}>{proc.mem}M</td>
+                      <td className="proc-cpu-cell" style={{ textAlign: 'right', minWidth: '48px' }}>
+                        <div
+                          className="proc-cpu-fill"
+                          style={{
+                            width: `${Math.min(proc.cpu, 100)}%`,
+                            background: proc.cpu > 50 ? 'rgba(200, 75, 47, 0.15)' : 'rgba(47, 168, 126, 0.15)'
+                          }}
+                        />
+                        <span style={{ position: 'relative', zIndex: 1, fontWeight: proc.cpu > 10 ? '700' : '400' }}>
+                          {proc.cpu}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
 
-          {/* Right Column (span-4) containing Response Time and Active Processes */}
-          <div className="span-4" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: '100%', minHeight: '100%' }}>
-            {/* Response Time Trend — fixed height, never grows */}
-            <div className="panel" style={{ margin: 0, height: '170px', display: 'flex', flexDirection: 'column' }}>
-              <div className="panel-header">
-                <span className="panel-title">Response Time Trend</span>
-                <span className="last-check-label">last 100 checks</span>
+          {/* Monitored Sites List — Full width span-12 card */}
+          <div className="panel span-12">
+            <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  Monitored Sites <span style={{ color: 'var(--accent)', fontSize: '0.8rem', verticalAlign: 'middle' }}>★</span>
+                </span>
+                <span className="last-check-label">
+                  <span style={{ color: '#ff4d4d', fontWeight: 'bold' }}>{sites.length}</span> sites
+                </span>
               </div>
-              <div className="chart-wrap" style={{ flex: 1, minHeight: 0 }}>
-                <Line data={chartData} options={chartOptions} />
-              </div>
+              <button
+                className="btn btn-accent"
+                onClick={() => {
+                  setEditingSite(null);
+                  setNewSite({ name: '', url: '', icon: '' });
+                  setIsModalOpen(true);
+                }}
+                style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+              >
+                + Add Site
+              </button>
             </div>
-
-            {/* Active Processes — fills remaining height */}
-            <div className="panel" style={{ margin: 0, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: '280px' }}>
-              <div className="panel-header" style={{ padding: '1.25rem 1.25rem 0.5rem 1.25rem', borderBottom: 'none' }}>
-                <span className="panel-title">Active Processes</span>
-              </div>
-              <div className="proc-list-container" style={{ flex: 1, overflowY: 'auto', padding: '0 1.25rem 1.25rem 1.25rem', fontSize: '0.68rem', fontFamily: 'DM Mono' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', color: 'var(--text2)' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--text3)' }}>
-                      <th style={{ padding: '4px 0' }}>PID</th>
-                      <th>CMD</th>
-                      <th>USER</th>
-                      <th style={{ textAlign: 'right' }}>MEM</th>
-                      <th style={{ textAlign: 'right' }}>CPU</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {processes.map((proc, i) => (
-                      <tr key={i} style={{ borderBottom: '1px solid rgba(200,200,200,0.02)' }}>
-                        <td style={{ padding: '4px 0', color: 'var(--accent)' }}>{proc.pid}</td>
-                        <td style={{ maxWidth: '75px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={proc.name}>{proc.name}</td>
-                        <td>{proc.user}</td>
-                        <td style={{ textAlign: 'right' }}>{proc.mem}M</td>
-                        <td className="proc-cpu-cell" style={{ textAlign: 'right', minWidth: '48px' }}>
-                          <div
-                            className="proc-cpu-fill"
-                            style={{
-                              width: `${Math.min(proc.cpu, 100)}%`,
-                              background: proc.cpu > 50 ? 'rgba(200, 75, 47, 0.15)' : 'rgba(47, 168, 126, 0.15)'
-                            }}
-                          />
-                          <span style={{ position: 'relative', zIndex: 1, fontWeight: proc.cpu > 10 ? '700' : '400' }}>
-                            {proc.cpu}%
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            <div className="col-headers">
+              <div></div>
+              <div className="col-h">Site</div>
+              <div className="col-h">Status</div>
+              <div className="col-h">Ping</div>
+              <div className="col-h">Latency</div>
+              <div className="col-h" style={{ textAlign: 'right' }}>Outages</div>
+              <div></div>
+            </div>
+            <div id="siteList">
+              {safeSites.length === 0 ? (
+                <div className="empty-state">No sites added yet — add sites to begin.</div>
+              ) : (
+                safeSites.map(site => site && (
+                  <div key={site.id} className="site-row clickable" onClick={() => site.url && window.open(site.url, '_blank')}>
+                    <div className={`status-dot ${site.status === 'success' ? 'online' : site.status === 'lan_up' ? 'lan' : site.status === 'slow' ? 'degraded' : 'offline'}`} title={site.status === 'lan_up' ? 'Reachable via LAN' : site.status === 'slow' ? 'Degraded' : site.status === 'success' ? 'Online' : 'Offline'}></div>
+                    <div>
+                      <div className="site-name">
+                        <Icon name={site.icon} size={18} style={{ marginRight: '8px', color: 'var(--text2)' }} />
+                        {site.name}
+                      </div>
+                      <div className="site-url">{site.url ? site.url.replace(/^https?:\/\//, '') : ''}</div>
+                      {Array.isArray(site.history) && site.history.length > 0 && (
+                        <div className="site-history-dots">
+                          {site.history.slice(-20).map((h, i) => (
+                            <div
+                              key={i}
+                              className={`history-dot ${h?.status === 'success' ? 'dot-up' :
+                                h?.status === 'slow' ? 'dot-slow' :
+                                  h?.status === 'lan_up' ? 'dot-up' :
+                                    h ? 'dot-down' : 'dot-unknown'
+                                }`}
+                              title={h?.status || 'unknown'}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className={`badge ${site.status === 'success' ? 'online' : site.status === 'lan_up' ? 'lan' : site.status === 'slow' ? 'degraded' : 'offline'}`}>
+                      {site.status === 'success' ? 'Online' : site.status === 'lan_up' ? 'LAN' : site.status === 'slow' ? 'Slow' : 'Offline'}
+                    </div>
+                    <div className="ping-val">{site.latency ? `${Math.round(site.latency)}ms` : '—'}</div>
+                    <div>
+                      <div className="latency-bar" style={site.status === 'lan_up' ? { border: '2px dotted #2fa87e', background: 'transparent' } : {}}>
+                        <div
+                          className="latency-fill"
+                          style={{
+                            width: site.status === 'lan_up' ? '0%' : `${Math.max(0, 100 - Math.min((site.latency || 0) / 30, 100))}%`,
+                            background: site.status === 'lan_up' ? 'transparent' : (site.latency || 0) >= 3000 ? 'var(--down)' : (site.latency || 0) >= 2000 ? 'var(--degraded)' : 'var(--up)',
+                            border: 'none'
+                          }}
+                        ></div>
+                      </div>
+                      <div className="latency-sub" style={{ color: (site.latency || 0) >= 3000 ? 'var(--down)' : (site.latency || 0) >= 2000 ? 'var(--degraded)' : 'var(--up)' }}>
+                        {site.latency ? (site.latency < 100 ? 'Very Fast' : site.latency < 2000 ? 'Fast' : site.latency < 3000 ? 'Slow' : 'Very Slow') : '—'}
+                      </div>
+                    </div>
+                    <div className="outage-badge" title="External outages recorded">
+                      {(site.outage_count || 0) > 0 ? `${site.outage_count} ↓` : '—'}
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px' }} onClick={(e) => e.stopPropagation()}>
+                      <button className="delete-btn" onClick={() => handleEditSite(site)} title="Edit"><Pencil size={12} /></button>
+                      <button className="delete-btn" onClick={() => handleDeleteSite(site.id, site.name)} title="Remove"><Trash2 size={12} /></button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
@@ -1214,8 +1229,12 @@ const App = () => {
                 const isFailed = drive.status.toLowerCase() === 'failed';
                 const usedPct = drive.used_pct ?? 0;
                 const diskColor = usedPct > 85 ? 'var(--down)' : usedPct > 75 ? 'var(--degraded)' : usedPct > 60 ? 'var(--lan)' : 'var(--up)';
+                const isLeftCol = idx % 2 === 0;
+                const borderStyle = isLeftCol
+                  ? { borderLeft: `5px solid ${diskColor}`, borderRight: '1px solid var(--border)' }
+                  : { borderRight: `5px solid ${diskColor}`, borderLeft: '1px solid var(--border)' };
                 return (
-                  <div key={idx} className={`drive-card ${isFailed ? 'failed' : ''}`}>
+                  <div key={idx} className={`drive-card ${isFailed ? 'failed' : ''}`} style={borderStyle}>
                     <div className="drive-header-row">
                       <div className="drive-title-area">
                         <div className="drive-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
