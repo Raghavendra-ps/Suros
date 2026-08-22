@@ -1,7 +1,8 @@
 services:
   backend:
     build: ./backend
-    container_name: server-monitor-backend
+    image: suros-backend:latest
+    container_name: Suros-Backend
     ports:
       - "7689:8000"
     volumes:
@@ -17,11 +18,13 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-
+    networks:
+      - Suros-Network
 
   frontend:
     build: ./frontend
-    container_name: server-monitor-frontend
+    image: suros-frontend:latest
+    container_name: Suros-frontend
     ports:
       - "8755:80"
     depends_on:
@@ -29,3 +32,9 @@ services:
     volumes:
       - ./frontend/static:/usr/share/nginx/html/static:ro
     restart: always
+    networks:
+      - Suros-Network
+
+networks:
+  Suros-Network:
+    name: Suros-Network
