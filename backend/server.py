@@ -29,6 +29,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger("odyssey-backend")
 
+def get_host_disk_usage(mountpoint):
+    host_path = f"/mnt/host{mountpoint}"
+    if os.path.exists(host_path):
+        try:
+            return psutil.disk_usage(host_path)
+        except Exception:
+            pass
+    return psutil.disk_usage(mountpoint)
+
 try:
     models.Base.metadata.create_all(bind=engine)
     
@@ -742,7 +751,7 @@ async def monitor_sites_task():
             sys_history = models.SystemHistory(
                 cpu=psutil.cpu_percent(),
                 ram=psutil.virtual_memory().percent,
-                disk=psutil.disk_usage('/').percent,
+                disk=get_host_disk_usage('/').percent,
                 gpu=gpu_metrics['util'] if gpu_metrics else None,
                 network_online=1 if server_online else 0
             )
@@ -966,7 +975,7 @@ def get_system_metrics():
         cpu_percent = psutil.cpu_percent(interval=None)
         cpu_cores = psutil.cpu_percent(percpu=True)
         memory = psutil.virtual_memory()
-        disk = psutil.disk_usage('/')
+        disk = get_host_disk_usage('/')
         gpu = get_gpu_metrics()
         
         # Calculate real-time network rates
@@ -994,7 +1003,7 @@ def get_system_metrics():
                     if partition.fstype in ('squashfs', 'tmpfs', 'devtmpfs', 'overlay', 'proc', 'sysfs', 'devpts'):
                         continue
                     
-                    usage = psutil.disk_usage(partition.mountpoint)
+                    usage = get_host_disk_usage(partition.mountpoint)
                     if usage.total < 1024 * 1024 * 1024:  # Skip partitions < 1GB
                         continue
                     
@@ -1362,7 +1371,7 @@ def check_drive_smart_status(device: str):
                 part_dev = part.device.lower().split("/")[-1]
                 if part_dev.startswith(dev_base):
                     try:
-                        usage = psutil.disk_usage(part.mountpoint)
+                        usage = get_host_disk_usage(part.mountpoint)
                         used_pct = round(usage.percent, 1)
                     except Exception:
                         pass

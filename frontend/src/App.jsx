@@ -854,52 +854,30 @@ const App = () => {
           <div className="panel bento-card span-4" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div className="stat-label">Storage</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', margin: '8px 0 2px' }}>
-              <span className="stat-value" style={{ fontSize: '1.8rem', fontWeight: '800' }}>{systemMetrics.total_storage?.percent || 0}%</span>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>{systemMetrics.total_storage?.used || 0} / {systemMetrics.total_storage?.total || 0} GB</span>
+              <span className="stat-value" style={{ fontSize: '1.8rem', fontWeight: '800' }}>{Math.round(systemMetrics.total_storage?.percent || 0)}%</span>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>{Math.round(systemMetrics.total_storage?.used || 0)} / {Math.round(systemMetrics.total_storage?.total || 0)} GB</span>
             </div>
             <div className="latency-bar" style={{ height: '5px', margin: '2px 0' }}>
-              <div className="storage-bar" style={{ width: `${systemMetrics.total_storage?.percent || 0}%`, height: '100%', backgroundColor: (systemMetrics.total_storage?.percent || 0) < 80 ? 'var(--up)' : 'var(--slow)' }}></div>
+              <div className="storage-bar" style={{ width: `${Math.round(systemMetrics.total_storage?.percent || 0)}%`, height: '100%', backgroundColor: (systemMetrics.total_storage?.percent || 0) < 80 ? 'var(--up)' : 'var(--slow)' }}></div>
             </div>
             <div className="sparkline-wrap">
               <Line
                 data={{
                   labels: ramHistory.map(h => h.time),
-                  datasets: [{ data: ramHistory.map(() => systemMetrics.total_storage?.percent || 0), borderColor: '#2f6fc8', borderWidth: 1.5, pointRadius: 0, tension: 0.4, fill: false }]
+                  datasets: [{ data: ramHistory.map(() => Math.round(systemMetrics.total_storage?.percent || 0)), borderColor: '#2f6fc8', borderWidth: 1.5, pointRadius: 0, tension: 0.4, fill: false }]
                 }}
                 options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, scales: { x: { display: false }, y: { display: false } }, animation: { duration: 300 } }}
               />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: 'var(--text3)', marginTop: '4px' }}>
               <span style={{ fontFamily: 'DM Mono' }}>Free Space</span>
-              <span style={{ fontFamily: 'DM Mono' }}>{systemMetrics.total_storage?.free || 0} GB</span>
+              <span style={{ fontFamily: 'DM Mono' }}>{Math.round(systemMetrics.total_storage?.free || 0)} GB</span>
             </div>
           </div>
 
-          {/* Bento Card 5: Active Services */}
-          <div className="stat-card up span-3">
-            <div className="stat-label">Active Services</div>
-            <div className="stat-value">
-              {stats.up}
-              {prevStats.current.up !== undefined && stats.up > prevStats.current.up && <span className="stat-trend up">↑</span>}
-              {prevStats.current.up !== undefined && stats.up < prevStats.current.up && <span className="stat-trend down">↓</span>}
-            </div>
-            <div className="stat-sub">status: success</div>
-          </div>
-
-          {/* Bento Card 6: Offline Services */}
-          <div className="stat-card down span-3">
-            <div className="stat-label">Offline Services</div>
-            <div className="stat-value">
-              {stats.down}
-              {prevStats.current.down !== undefined && stats.down > prevStats.current.down && <span className="stat-trend down">↑</span>}
-              {prevStats.current.down !== undefined && stats.down < prevStats.current.down && <span className="stat-trend up">↓</span>}
-            </div>
-            <div className="stat-sub">action required</div>
-          </div>
-
-          {/* Bento Card 8: Server Outages (Including Avg Latency, Connectivity & Response Time Trend Graph) - span-6 */}
-          <div className="stat-card neutral span-6" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.25rem' }}>
-            <div style={{ display: 'flex', gap: '1rem', height: '100%' }}>
+          {/* Bento Card 8: Server Outages (Including Avg Latency, Connectivity & Response Time Trend Graph) - span-12 */}
+          <div className="stat-card neutral span-12" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.25rem' }}>
+            <div style={{ display: 'flex', gap: '1.5rem', height: '100%' }}>
               {/* Left Column: Stats & Sparkline */}
               <div style={{ flex: '1', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 <div>
@@ -922,7 +900,7 @@ const App = () => {
                     <span>Power: {stats.power_outages || 0}</span>
                   </div>
                 </div>
-                <div style={{ height: '40px', marginTop: '6px' }}>
+                <div style={{ height: '55px', marginTop: '6px' }}>
                   <div className="stat-label" style={{ fontSize: '0.55rem', textTransform: 'uppercase', marginBottom: '2px', opacity: 0.8 }}>Connectivity History</div>
                   <Line
                     data={connectivityChartData}
@@ -932,7 +910,16 @@ const App = () => {
                       plugins: { legend: { display: false }, tooltip: { enabled: false } },
                       scales: {
                         x: { display: false },
-                        y: { display: false, min: 0, max: 1.1 }
+                        y: {
+                          display: true,
+                          grid: { display: false },
+                          ticks: {
+                            color: 'var(--text3)',
+                            font: { size: 7, family: 'DM Mono' },
+                            stepSize: 1,
+                            callback: (val) => val === 1 ? 'UP' : val === 0 ? 'DN' : ''
+                          }
+                        }
                       },
                       animation: { duration: 300 }
                     }}
@@ -941,7 +928,7 @@ const App = () => {
               </div>
               
               {/* Right Column: Response Time Trend Chart */}
-              <div style={{ flex: '1.2', display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--border)', paddingLeft: '1rem' }}>
+              <div style={{ flex: '1.4', display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--border)', paddingLeft: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                   <span className="stat-label" style={{ fontSize: '0.62rem', letterSpacing: '0.05em' }}>Response Time</span>
                 </div>
@@ -954,7 +941,15 @@ const App = () => {
                       plugins: { legend: { display: false }, tooltip: { enabled: false } },
                       scales: {
                         x: { display: false },
-                        y: { display: false }
+                        y: {
+                          display: true,
+                          grid: { color: 'var(--border)', drawTicks: false },
+                          ticks: {
+                            color: 'var(--text3)',
+                            font: { size: 7, family: 'DM Mono' },
+                            callback: (val) => `${Math.round(val)}ms`
+                          }
+                        }
                       },
                       animation: { duration: 300 }
                     }}
@@ -1094,7 +1089,13 @@ const App = () => {
             <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <span className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  Monitored Sites <span style={{ color: '#ff4d4d', fontWeight: 'bold', fontSize: '0.9rem', background: 'rgba(255,77,77,0.1)', padding: '2px 8px', borderRadius: '4px' }}>{sites.length}</span>
+                  Monitored Sites 
+                  <span style={{ color: '#2fa87e', fontWeight: 'bold', fontSize: '0.85rem', background: 'rgba(47,168,126,0.1)', padding: '2px 8px', borderRadius: '4px' }}>
+                    {sites.filter(s => s.status === 'online').length}
+                  </span>
+                  <span style={{ color: '#c84b2f', fontWeight: 'bold', fontSize: '0.85rem', background: 'rgba(200,75,47,0.1)', padding: '2px 8px', borderRadius: '4px' }}>
+                    {sites.filter(s => s.status !== 'online').length}
+                  </span>
                 </span>
               </div>
               <button

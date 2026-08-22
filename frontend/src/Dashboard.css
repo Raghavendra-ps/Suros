@@ -52,7 +52,7 @@ body {
 /* ── Header ── */
 header {
   border-bottom: 1px solid var(--border);
-  padding: 0 2.5rem;
+  padding: 0 1.5rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -122,7 +122,7 @@ header {
 .theme-toggle:hover { border-color: var(--text); }
 
 /* ── Layout ── */
-.main { max-width: 1800px; margin: 0 auto; padding: 2rem 2.5rem; }
+.main { width: 100%; max-width: 100%; margin: 0; padding: 1.5rem; }
 
 /* ── Hero ── */
 .hero {
