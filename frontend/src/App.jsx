@@ -799,7 +799,7 @@ const App = () => {
                 <span style={{ fontSize: '0.7rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>{systemMetrics.memory.used} / {systemMetrics.memory.total} GB</span>
               </div>
               <div className="latency-bar" style={{ height: '5px', margin: '2px 0' }}>
-                <div className="latency-fill" style={{ width: `${Math.round(systemMetrics.memory.percent)}%`, background: systemMetrics.memory.percent > 80 ? 'var(--down)' : 'var(--up)' }}></div>
+                <div className="latency-fill" style={{ width: `${Math.round(systemMetrics.memory.percent)}%`, background: systemMetrics.memory.percent < 50 ? 'var(--up)' : systemMetrics.memory.percent < 80 ? 'var(--lan)' : 'var(--down)' }}></div>
               </div>
             </div>
             <div className="sparkline-wrap" style={{ height: '80px', marginTop: '6px' }}>
@@ -817,10 +817,6 @@ const App = () => {
                 }}
               />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: 'var(--text3)', marginTop: '4px' }}>
-              <span style={{ fontFamily: 'DM Mono' }}>Pressure</span>
-              <span className={`badge ${systemMetrics.memory.percent > 85 ? 'offline' : 'online'}`} style={{ fontSize: '0.58rem', padding: '1px 8px' }}>{systemMetrics.memory.percent > 85 ? 'High' : 'Low'}</span>
-            </div>
           </div>
 
           {/* Bento Card 3: GPU Metrics */}
@@ -834,15 +830,21 @@ const App = () => {
               <span style={{ fontSize: '0.7rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>{systemMetrics.temp?.gpu ? `${Math.round(systemMetrics.temp.gpu)}°C` : 'Temp N/A'}</span>
             </div>
             <div className="latency-bar" style={{ height: '5px', margin: '2px 0' }}>
-              <div className="latency-fill" style={{ width: `${Math.round(systemMetrics.gpu?.util || 0)}%`, background: (systemMetrics.gpu?.util || 0) > 80 ? 'var(--down)' : 'var(--up)' }}></div>
+              <div className="latency-fill" style={{ width: `${systemMetrics.gpu ? Math.round(systemMetrics.gpu.util) : 0}%`, background: systemMetrics.gpu && systemMetrics.gpu.util > 80 ? 'var(--down)' : 'var(--up)' }}></div>
             </div>
-            <div className="sparkline-wrap">
+            <div className="sparkline-wrap" style={{ height: '80px', marginTop: '6px' }}>
               <Line
-                data={{
-                  labels: ramHistory.map(h => h.time),
-                  datasets: [{ data: ramHistory.map(() => systemMetrics.gpu?.util || 0), borderColor: '#c84b2f', borderWidth: 1.5, pointRadius: 0, tension: 0.4, fill: false }]
+                data={gpuChartData}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                  scales: {
+                    x: { display: false },
+                    y: { display: false, min: 0, max: 100 }
+                  },
+                  animation: { duration: 300 }
                 }}
-                options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, scales: { x: { display: false }, y: { display: false } }, animation: { duration: 300 } }}
               />
             </div>
             <div style={{ fontSize: '0.62rem', color: 'var(--text3)', fontFamily: 'DM Mono', marginTop: '4px' }}>
@@ -876,7 +878,7 @@ const App = () => {
           </div>
 
           {/* Bento Card 8: Server Outages (Including Avg Latency & Response Time Graph) - span-12 */}
-          <div className="stat-card neutral span-12" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.25rem' }}>
+          <div className="stat-card neutral span-12" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.25rem', maxHeight: '160px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -893,18 +895,18 @@ const App = () => {
                     </div>
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: '10px', fontSize: '0.58rem', color: 'var(--text3)', fontFamily: 'DM Mono', marginTop: '4px' }}>
+                <div style={{ display: 'flex', gap: '10px', fontSize: '0.58rem', color: 'var(--text2)', fontFamily: 'DM Mono', marginTop: '4px' }}>
                   <span>Net: {stats.network_outages || 0}</span>
                   <span>Power: {stats.power_outages || 0}</span>
                 </div>
               </div>
               
               {/* Response Time Chart (in middle) */}
-              <div style={{ display: 'flex', flexDirection: 'column', marginTop: '10px', flex: 1, minHeight: 0 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', marginTop: '4px', flex: 1, minHeight: 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
                   <span className="stat-label" style={{ fontSize: '0.62rem', letterSpacing: '0.05em' }}>Response Time</span>
                 </div>
-                <div style={{ flex: 1, minHeight: '60px' }}>
+                <div style={{ flex: 1, minHeight: '40px' }}>
                   <Line
                     data={chartData}
                     options={{
@@ -917,7 +919,7 @@ const App = () => {
                           display: true,
                           grid: { color: 'var(--border)', drawTicks: false },
                           ticks: {
-                            color: 'var(--text3)',
+                            color: '#8a8278',
                             font: { size: 7, family: 'DM Mono' },
                             callback: (val) => `${Math.round(val)}ms`
                           }
