@@ -936,15 +936,8 @@ const App = () => {
             <div className="stat-sub">action required</div>
           </div>
 
-          {/* Bento Card 7: Average Latency */}
-          <div className="stat-card warn span-3">
-            <div className="stat-label">Average Latency</div>
-            <div className="stat-value">{formatLatency(stats.avg_latency)}</div>
-            <div className="stat-sub">external only</div>
-          </div>
-
-          {/* Bento Card 8: Server Outages (Including Avg Latency & Connectivity Graph) */}
-          <div className="stat-card neutral span-3" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.25rem' }}>
+          {/* Bento Card 8: Server Outages (Including Avg Latency & Connectivity Graph) - span-6 */}
+          <div className="stat-card neutral span-6" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.25rem' }}>
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
