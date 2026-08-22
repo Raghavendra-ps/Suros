@@ -825,9 +825,18 @@ const App = () => {
                   plugins: { legend: { display: false }, tooltip: { enabled: false } },
                   scales: {
                     x: { display: false },
-                    y: { display: false, min: 0, max: 100 }
+                    y: {
+                      display: true,
+                      grid: { color: 'rgba(200,200,200,0.05)', drawTicks: false },
+                      ticks: {
+                        color: '#55504a',
+                        font: { size: 7, family: 'DM Mono' },
+                        callback: (val) => `${Math.round(val)}ms`
+                      }
+                    }
                   },
-                  animation: { duration: 300 }
+                  animation: { duration: 300 },
+                  backgroundColor: 'transparent'
                 }}
               />
             </div>
@@ -894,7 +903,7 @@ const App = () => {
           {/* Bento Card 8: Server Outages (Including Avg Latency & Response Time Graph) - span-12 */}
           <div className="stat-card neutral span-12" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.25rem', maxHeight: '160px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
-              
+
               {/* Aligned Headers Row */}
               <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: '8px' }}>
                 <div style={{ minWidth: '130px' }} className="stat-label">Server Outages</div>
@@ -1081,7 +1090,7 @@ const App = () => {
             <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <span className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  Monitored Sites 
+                  Monitored Sites
                   <span style={{ color: '#2fa87e', fontWeight: 'bold', fontSize: '0.85rem', background: 'rgba(47,168,126,0.1)', padding: '2px 8px', borderRadius: '4px' }}>
                     {sites.filter(s => s.status === 'online').length}
                   </span>
