@@ -875,8 +875,8 @@ const App = () => {
             </div>
           </div>
 
-          {/* Bento Card 8: Server Outages (Including Avg Latency & Response Time Graph) - span-4 */}
-          <div className="stat-card neutral span-4" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.25rem' }}>
+          {/* Bento Card 8: Server Outages (Including Avg Latency & Response Time Graph) - span-12 */}
+          <div className="stat-card neutral span-12" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.25rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -1213,7 +1213,7 @@ const App = () => {
                                 return cap;
                               })()}
                             </span>
-                            {usedPct > 0 && (
+                            {usedPct >= 0 && (
                               <div className="drive-storage-bar">
                                 <div
                                   className="drive-storage-fill"
@@ -1221,7 +1221,7 @@ const App = () => {
                                 />
                               </div>
                             )}
-                            {usedPct > 0 && <span style={{ fontSize: '0.55rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>{Math.round(usedPct)}% used</span>}
+                            {usedPct >= 0 && <span style={{ fontSize: '0.55rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>{Math.round(usedPct)}% used</span>}
                           </div>
                         </div>
                         <div className="drive-metric-col">
