@@ -21,7 +21,6 @@ const Icon = ({ name, size = 16, ...props }) => {
 
 const ICONS = Object.keys(IconMap);
 
-// Format latency: 999ms → "999 ms", 1000ms → "1k ms", 1345ms → "1.3k ms"
 const formatLatency = (ms) => {
   if (ms < 1000) return `${Math.round(ms)} ms`;
   if (ms < 10000) return `${(ms / 1000).toFixed(1)}k ms`;
@@ -56,11 +55,11 @@ const App = () => {
       console.error('Error fetching drives:', err);
     }
   };
+
   const [theme, setTheme] = useState(localStorage.getItem('odyssey_theme') || 'dark');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSite, setEditingSite] = useState(null);
 
-  // Settings Slide-out & Alert state
   const [settings, setSettings] = useState({
     dashboard_name: 'Odyssey',
     logo_url: null,
@@ -81,7 +80,6 @@ const App = () => {
   const [draftSettings, setDraftSettings] = useState({});
   const [saveStatus, setSaveStatus] = useState(null);
 
-
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
   const [renameDevice, setRenameDevice] = useState('');
   const [renameVal, setRenameVal] = useState('');
@@ -95,6 +93,7 @@ const App = () => {
       console.error('Error saving drive name:', err);
     }
   };
+
   const [newSite, setNewSite] = useState({ name: '', url: '', icon: 'Globe' });
   const [lastCheckTime, setLastCheckTime] = useState(null);
   const [timeAgo, setTimeAgo] = useState('—');
@@ -159,14 +158,12 @@ const App = () => {
       setCustomName(res.data.dashboard_name || 'Odyssey');
       setCustomLogo(res.data.logo_url || null);
       setSettings(res.data);
-      // Only populate draftSettings on initial load, never overwrite user's in-progress edits
       setDraftSettings(prev => Object.keys(prev).length === 0 ? res.data : prev);
     } catch (err) {
       console.error('Error fetching settings:', err);
     }
   };
 
-  // Mount-only effect: initial data load + set up all polling intervals
   useEffect(() => {
     const init = async () => {
       await Promise.all([fetchSettings(), fetchSites(), fetchStats(), fetchSystemMetrics(), fetchSystemHistory(), fetchDrives(), fetchProcesses()]);
@@ -174,20 +171,9 @@ const App = () => {
     };
     init();
 
-    const procInterval = setInterval(() => {
-      fetchProcesses();
-    }, 10000);
-
-    const interval = setInterval(() => {
-      fetchSites();
-      fetchStats();
-      fetchSystemHistory();
-      fetchDrives();
-    }, 30000);
-
-    const metricsInterval = setInterval(() => {
-      fetchSystemMetrics();
-    }, 5000);
+    const procInterval = setInterval(() => { fetchProcesses(); }, 10000);
+    const interval = setInterval(() => { fetchSites(); fetchStats(); fetchSystemHistory(); fetchDrives(); }, 30000);
+    const metricsInterval = setInterval(() => { fetchSystemMetrics(); }, 5000);
 
     return () => {
       clearInterval(interval);
@@ -197,7 +183,6 @@ const App = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Separate effect purely to update the "checked Xs ago" label
   useEffect(() => {
     if (!lastCheckTime) return;
     const timeAgoInterval = setInterval(() => {
@@ -215,7 +200,6 @@ const App = () => {
   const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
   const toggleSettings = () => setSettingsOpen(!settingsOpen);
 
-  // Immediate save for toggle-type controls (checkboxes, selects)
   const handleSaveAlertSettings = async (updatedSettings) => {
     try {
       const res = await axios.put('/api/settings', updatedSettings);
@@ -228,7 +212,6 @@ const App = () => {
     }
   };
 
-  // Deferred save for text fields — called by Save button
   const handleSaveDraft = async () => {
     setSaveStatus('saving');
     try {
@@ -264,19 +247,13 @@ const App = () => {
   const handleLogoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     const formData = new FormData();
     formData.append('file', file);
-
     try {
-      const response = await fetch('/api/upload-logo', {
-        method: 'POST',
-        body: formData
-      });
+      const response = await fetch('/api/upload-logo', { method: 'POST', body: formData });
       if (response.ok) {
         const data = await response.json();
         setCustomLogo(data.url);
-        // Fetch latest settings from backend
         await fetchSettings();
       }
     } catch (err) {
@@ -288,7 +265,6 @@ const App = () => {
     if (!newSite.name || !newSite.url) return;
     let url = newSite.url;
     if (!url.startsWith('http')) url = 'https://' + url;
-
     try {
       if (editingSite) {
         await axios.put(`/api/sites/${editingSite.id}`, { ...newSite, url });
@@ -330,8 +306,6 @@ const App = () => {
     }
   };
 
-
-
   const safeSites = Array.isArray(sites) ? sites : [];
   const safeSystemHistory = Array.isArray(systemHistory) ? systemHistory : [];
 
@@ -339,7 +313,7 @@ const App = () => {
     ? safeSites[0].history.map(h => h ? new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' }) : '')
     : [];
 
-  const chartData = {
+  const latencyChartData = {
     labels: chartLabels,
     datasets: [{
       label: 'Avg Latency (ms)',
@@ -350,7 +324,6 @@ const App = () => {
       backgroundColor: 'rgba(200,75,47,0.07)',
       borderWidth: 2,
       pointRadius: 0,
-      pointBackgroundColor: '#c84b2f',
       tension: 0.3,
       fill: true,
     }]
@@ -384,65 +357,18 @@ const App = () => {
     }]
   };
 
-  const chartOptions = {
+  // Shared mini sparkline options — no axes, no borders, transparent bg
+  const sparklineOptions = {
     responsive: true,
     maintainAspectRatio: false,
-    animation: { duration: 500 },
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        backgroundColor: '#1a1816',
-        titleColor: '#f2ede4',
-        bodyColor: '#8a8278',
-        borderColor: '#332e28',
-        borderWidth: 1,
-        titleFont: { family: 'DM Mono', size: 10 },
-        bodyFont: { family: 'DM Mono', size: 10 },
-      }
-    },
+    plugins: { legend: { display: false }, tooltip: { enabled: false } },
     scales: {
-      x: {
-        grid: { color: 'rgba(200,200,200,0.05)', display: false },
-        ticks: {
-          color: '#55504a',
-          font: { family: 'DM Mono', size: 9 },
-          maxTicksLimit: 24,
-          callback: function (value, index, values) {
-            const label = this.getLabelForValue(value);
-            // Only show labels for 00:00, 06:00, 12:00, 18:00
-            if (label === '00:00' || label === '06:00' || label === '12:00' || label === '18:00') {
-              return label;
-            }
-            return null;
-          }
-        }
-      },
-      y: {
-        grid: { color: 'rgba(200,200,200,0.05)' },
-        ticks: { color: '#55504a', font: { family: 'DM Mono', size: 9 }, padding: 8 },
-        beginAtZero: true
-      }
-    }
+      x: { display: false, border: { color: 'transparent' } },
+      y: { display: false, border: { color: 'transparent' }, min: 0, max: 100 }
+    },
+    animation: { duration: 300 }
   };
 
-  // Dial Helpers
-  const arc = 219.9;
-  // Latency thresholds: LAN 0-49ms, Fast 50-100ms, Average 101-2000ms, Slow 2000ms+
-  const getLatencyLabel = (lat) => {
-    if (lat === null || lat === undefined) return '—';
-    if (lat < 50) return 'LAN';
-    if (lat <= 100) return 'Fast';
-    if (lat <= 2000) return 'Average';
-    return 'Slow';
-  };
-  const getLatencyColor = (lat) => {
-    if (lat === null || lat === undefined) return 'var(--text3)';
-    if (lat <= 100) return 'var(--up)';
-    if (lat <= 2000) return 'var(--degraded)';
-    return 'var(--down)';
-  };
-
-  // Connectivity history chart for server outages
   const connectivityChartData = {
     labels: (stats.connectivity_history || []).map(h => new Date(h.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })),
     datasets: [{
@@ -476,10 +402,44 @@ const App = () => {
       }
     },
     scales: {
-      x: { grid: { color: 'rgba(200,200,200,0.05)', display: false }, ticks: { color: '#55504a', font: { family: 'DM Mono', size: 9 }, maxTicksLimit: 10 } },
-      y: { grid: { color: 'rgba(200,200,200,0.05)' }, ticks: { color: '#55504a', font: { family: 'DM Mono', size: 9 }, beginAtZero: true, max: 1 } },
+      x: {
+        grid: { color: 'rgba(200,200,200,0.05)', display: false },
+        border: { color: 'transparent' },
+        ticks: { color: '#55504a', font: { family: 'DM Mono', size: 9 }, maxTicksLimit: 10 }
+      },
+      y: {
+        grid: { color: 'rgba(200,200,200,0.05)' },
+        border: { color: 'transparent' },
+        ticks: { color: '#55504a', font: { family: 'DM Mono', size: 9 }, beginAtZero: true, max: 1 }
+      },
     }
   };
+
+  // Response time chart options — no CSS vars, all literal colors
+  const responseTimeOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+    scales: {
+      x: {
+        display: false,
+        border: { color: 'transparent' }
+      },
+      y: {
+        display: true,
+        grid: { color: 'rgba(200,200,200,0.05)', drawTicks: false },
+        border: { color: 'transparent' },
+        ticks: {
+          color: '#55504a',
+          font: { size: 7, family: 'DM Mono' },
+          callback: (val) => `${Math.round(val)}ms`
+        }
+      }
+    },
+    animation: { duration: 300 }
+  };
+
+  const arc = 219.9;
 
   const getDialStyle = (pct) => ({
     strokeDashoffset: arc - (Math.min(100, Math.max(0, pct)) / 100) * arc,
@@ -489,10 +449,7 @@ const App = () => {
   if (isLoading) {
     return (
       <div className="app-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
-        <div className="loader-orbit">
-          <div className="loader-dot"></div>
-
-        </div>
+        <div className="loader-orbit"></div>
       </div>
     );
   }
@@ -501,7 +458,11 @@ const App = () => {
     <div className="app-container">
       <header>
         <div className="logo" style={{ display: 'flex', alignItems: 'center' }}>
-          <img src={theme === 'dark' ? '/suros-logo-dark.png' : '/suros-logo-light.png'} style={{ height: '32px', width: 'auto', objectFit: 'contain' }} alt="Suros Logo" />
+          <img
+            src={theme === 'dark' ? '/suros-logo-dark.png' : '/suros-logo-light.png'}
+            style={{ height: '32px', width: 'auto', objectFit: 'contain' }}
+            alt="Suros Logo"
+          />
           <span className="suros-title-text" style={{
             fontFamily: "'Syne', sans-serif",
             fontWeight: 800,
@@ -522,22 +483,16 @@ const App = () => {
           <button className="header-icon-btn" onClick={toggleTheme} title="Toggle Theme">
             {theme === 'dark' ? <Moon size={20} strokeWidth={1.5} /> : <Sun size={20} strokeWidth={1.5} />}
           </button>
-          <button
-            className="header-icon-btn"
-            onClick={toggleSettings}
-            title="Open Settings"
-          >
+          <button className="header-icon-btn" onClick={toggleSettings} title="Open Settings">
             <Settings size={20} strokeWidth={1.5} />
           </button>
         </div>
       </header>
 
-      {/* Settings Drawer Slide-out Backdrop Overlay */}
       {settingsOpen && (
         <div className="drawer-backdrop" onClick={() => setSettingsOpen(false)}></div>
       )}
 
-      {/* Settings Drawer Panel */}
       <div className={`settings-drawer ${settingsOpen ? 'open' : ''}`}>
         <div className="drawer-header">
           <h2>Settings</h2>
@@ -545,7 +500,6 @@ const App = () => {
         </div>
 
         <div className="drawer-split-layout">
-          {/* LEFT SIDE: Category Sidebar Selector */}
           <div className="drawer-sidebar">
             <button
               className={`sidebar-tab-btn ${activeSettingsTab === 'email' ? 'active' : ''}`}
@@ -561,7 +515,6 @@ const App = () => {
             </button>
           </div>
 
-          {/* RIGHT SIDE: Fields & Inputs */}
           <div className="drawer-fields-container">
             {activeSettingsTab === 'email' && (
               <div className="settings-section-fields">
@@ -594,71 +547,39 @@ const App = () => {
                 {draftSettings.email_provider === 'resend' ? (
                   <div className="form-group">
                     <label>Resend API Key</label>
-                    <input
-                      type="password"
-                      value={draftSettings.email_password || ''}
-                      onChange={(e) => setDraftSettings({ ...draftSettings, email_password: e.target.value })}
-                      placeholder="re_..."
-                    />
+                    <input type="password" value={draftSettings.email_password || ''} onChange={(e) => setDraftSettings({ ...draftSettings, email_password: e.target.value })} placeholder="re_..." />
                   </div>
                 ) : (
                   <>
                     <div className="form-group">
                       <label>SMTP Username / Email</label>
-                      <input
-                        type="email"
-                        value={draftSettings.email_username || ''}
-                        onChange={(e) => setDraftSettings({ ...draftSettings, email_username: e.target.value })}
-                        placeholder="your-email@provider.com"
-                      />
+                      <input type="email" value={draftSettings.email_username || ''} onChange={(e) => setDraftSettings({ ...draftSettings, email_username: e.target.value })} placeholder="your-email@provider.com" />
                     </div>
                     <div className="form-group">
                       <label>SMTP Password / App Password</label>
-                      <input
-                        type="password"
-                        value={draftSettings.email_password || ''}
-                        onChange={(e) => setDraftSettings({ ...draftSettings, email_password: e.target.value })}
-                        placeholder="••••••••••••••••"
-                      />
+                      <input type="password" value={draftSettings.email_password || ''} onChange={(e) => setDraftSettings({ ...draftSettings, email_password: e.target.value })} placeholder="••••••••••••••••" />
                     </div>
                     <div className="form-group">
                       <label>Custom SMTP Server (optional)</label>
-                      <input
-                        type="text"
-                        value={draftSettings.email_smtp_server || ''}
-                        onChange={(e) => setDraftSettings({ ...draftSettings, email_smtp_server: e.target.value })}
-                        placeholder="smtp.provider.com"
-                      />
+                      <input type="text" value={draftSettings.email_smtp_server || ''} onChange={(e) => setDraftSettings({ ...draftSettings, email_smtp_server: e.target.value })} placeholder="smtp.provider.com" />
                     </div>
                     <div className="form-group">
                       <label>SMTP Port (optional)</label>
-                      <input
-                        type="number"
-                        value={draftSettings.email_smtp_port || 587}
-                        onChange={(e) => setDraftSettings({ ...draftSettings, email_smtp_port: parseInt(e.target.value) || 587 })}
-                        placeholder="587"
-                      />
+                      <input type="number" value={draftSettings.email_smtp_port || 587} onChange={(e) => setDraftSettings({ ...draftSettings, email_smtp_port: parseInt(e.target.value) || 587 })} placeholder="587" />
                     </div>
                   </>
                 )}
 
                 <div className="form-group">
                   <label>Recipient Address</label>
-                  <input
-                    type="email"
-                    value={draftSettings.email_recipient || ''}
-                    onChange={(e) => setDraftSettings({ ...draftSettings, email_recipient: e.target.value })}
-                    placeholder="notifications@recipient.com"
-                  />
+                  <input type="email" value={draftSettings.email_recipient || ''} onChange={(e) => setDraftSettings({ ...draftSettings, email_recipient: e.target.value })} placeholder="notifications@recipient.com" />
                 </div>
 
                 <div className="settings-save-row">
                   <button className="btn btn-accent" onClick={handleSaveDraft} disabled={saveStatus === 'saving'}>
                     {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? '✓ Saved' : saveStatus === 'error' ? '✗ Error' : 'Save Changes'}
                   </button>
-                  <button className="btn" onClick={handleTestNotifications} style={{ marginLeft: '0.5rem' }}>
-                    Test Connection
-                  </button>
+                  <button className="btn" onClick={handleTestNotifications} style={{ marginLeft: '0.5rem' }}>Test Connection</button>
                 </div>
                 {testStatus && <div className="test-status-msg">{testStatus}</div>}
               </div>
@@ -681,41 +602,24 @@ const App = () => {
 
                 <div className="form-group">
                   <label>ntfy Server URL</label>
-                  <input
-                    type="text"
-                    value={draftSettings.ntfy_url || ''}
-                    onChange={(e) => setDraftSettings({ ...draftSettings, ntfy_url: e.target.value })}
-                    placeholder="https://ntfy.sh"
-                  />
+                  <input type="text" value={draftSettings.ntfy_url || ''} onChange={(e) => setDraftSettings({ ...draftSettings, ntfy_url: e.target.value })} placeholder="https://ntfy.sh" />
                 </div>
 
                 <div className="form-group">
                   <label>Topic</label>
-                  <input
-                    type="text"
-                    value={draftSettings.ntfy_topic || ''}
-                    onChange={(e) => setDraftSettings({ ...draftSettings, ntfy_topic: e.target.value })}
-                    placeholder="my-secret-topic"
-                  />
+                  <input type="text" value={draftSettings.ntfy_topic || ''} onChange={(e) => setDraftSettings({ ...draftSettings, ntfy_topic: e.target.value })} placeholder="my-secret-topic" />
                 </div>
 
                 <div className="form-group">
                   <label>Access Token (optional)</label>
-                  <input
-                    type="password"
-                    value={draftSettings.ntfy_token || ''}
-                    onChange={(e) => setDraftSettings({ ...draftSettings, ntfy_token: e.target.value })}
-                    placeholder="tk_..."
-                  />
+                  <input type="password" value={draftSettings.ntfy_token || ''} onChange={(e) => setDraftSettings({ ...draftSettings, ntfy_token: e.target.value })} placeholder="tk_..." />
                 </div>
 
                 <div className="settings-save-row">
                   <button className="btn btn-accent" onClick={handleSaveDraft} disabled={saveStatus === 'saving'}>
                     {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? '✓ Saved' : saveStatus === 'error' ? '✗ Error' : 'Save Changes'}
                   </button>
-                  <button className="btn" onClick={handleTestNotifications} style={{ marginLeft: '0.5rem' }}>
-                    Test Connection
-                  </button>
+                  <button className="btn" onClick={handleTestNotifications} style={{ marginLeft: '0.5rem' }}>Test Connection</button>
                 </div>
                 {testStatus && <div className="test-status-msg">{testStatus}</div>}
               </div>
@@ -723,10 +627,11 @@ const App = () => {
           </div>
         </div>
       </div>
+
       <div className="main">
         <div className="bento-grid">
 
-          {/* Bento Card 1: CPU Metrics (Full Length) */}
+          {/* Card 1: CPU Metrics */}
           <div className="panel bento-card span-12">
             <div className="stat-label" style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>CPU Metrics</span>
@@ -734,7 +639,6 @@ const App = () => {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '160px 1.2fr 3.8fr', gap: '2rem', alignItems: 'center' }}>
 
-              {/* Gauge */}
               <div className="cpu-gauge-wrap">
                 <svg className="cpu-gauge-svg" viewBox="0 0 200 115" width="150" height="86">
                   <path d="M 22,108 A 78,78 0 0 1 178,108" fill="none" stroke="var(--surface3)" strokeWidth="13" strokeLinecap="round" />
@@ -754,7 +658,6 @@ const App = () => {
                 </svg>
               </div>
 
-              {/* Stats column */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', justifyContent: 'center' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>Temperature</span>
@@ -776,7 +679,6 @@ const App = () => {
                 </div>
               </div>
 
-              {/* Core Heatmap Bars */}
               <div style={{ width: '100%' }}>
                 <span style={{ fontSize: '0.6rem', color: 'var(--text3)', fontFamily: 'DM Mono', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: '6px' }}>Core Utilization</span>
                 {systemMetrics.cpu_cores && systemMetrics.cpu_cores.length > 0 ? (
@@ -804,7 +706,7 @@ const App = () => {
             </div>
           </div>
 
-          {/* Bento Card 2: RAM Metrics */}
+          {/* Card 2: RAM Metrics */}
           <div className="panel bento-card span-4" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div>
               <div className="stat-label">RAM Metrics</div>
@@ -817,32 +719,11 @@ const App = () => {
               </div>
             </div>
             <div className="sparkline-wrap" style={{ height: '80px', marginTop: '6px' }}>
-              <Line
-                data={memoryChartData}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: { legend: { display: false }, tooltip: { enabled: false } },
-                  scales: {
-                    x: { display: false },
-                    y: {
-                      display: true,
-                      grid: { color: 'rgba(200,200,200,0.05)', drawTicks: false },
-                      ticks: {
-                        color: '#55504a',
-                        font: { size: 7, family: 'DM Mono' },
-                        callback: (val) => `${Math.round(val)}ms`
-                      }
-                    }
-                  },
-                  animation: { duration: 300 },
-                  backgroundColor: 'transparent'
-                }}
-              />
+              <Line data={memoryChartData} options={sparklineOptions} />
             </div>
           </div>
 
-          {/* Bento Card 3: GPU Metrics */}
+          {/* Card 3: GPU Metrics */}
           <div className="panel bento-card span-4" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div className="stat-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>GPU Metrics</span>
@@ -856,26 +737,14 @@ const App = () => {
               <div className="latency-fill" style={{ width: `${systemMetrics.gpu ? Math.round(systemMetrics.gpu.util) : 0}%`, background: systemMetrics.gpu && systemMetrics.gpu.util > 80 ? 'var(--down)' : 'var(--up)' }}></div>
             </div>
             <div className="sparkline-wrap" style={{ height: '80px', marginTop: '6px' }}>
-              <Line
-                data={gpuChartData}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: { legend: { display: false }, tooltip: { enabled: false } },
-                  scales: {
-                    x: { display: false },
-                    y: { display: false, min: 0, max: 100 }
-                  },
-                  animation: { duration: 300 }
-                }}
-              />
+              <Line data={gpuChartData} options={sparklineOptions} />
             </div>
             <div style={{ fontSize: '0.62rem', color: 'var(--text3)', fontFamily: 'DM Mono', marginTop: '4px' }}>
               {systemMetrics.gpu ? `VRAM: ${systemMetrics.gpu.memory.used}/${systemMetrics.gpu.memory.total} GB` : 'No GPU detected'}
             </div>
           </div>
 
-          {/* Bento Card 4: Storage */}
+          {/* Card 4: Storage */}
           <div className="panel bento-card span-4" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div className="stat-label">Storage</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', margin: '8px 0 2px' }}>
@@ -891,7 +760,7 @@ const App = () => {
                   labels: ramHistory.map(h => h.time),
                   datasets: [{ data: ramHistory.map(() => Math.round(systemMetrics.total_storage?.percent || 0)), borderColor: '#2f6fc8', borderWidth: 1.5, pointRadius: 0, tension: 0.4, fill: false }]
                 }}
-                options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, scales: { x: { display: false }, y: { display: false } }, animation: { duration: 300 } }}
+                options={sparklineOptions}
               />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: 'var(--text3)', marginTop: '4px' }}>
@@ -900,20 +769,17 @@ const App = () => {
             </div>
           </div>
 
-          {/* Bento Card 8: Server Outages (Including Avg Latency & Response Time Graph) - span-12 */}
+          {/* Card 8: Server Outages + Response Time + Avg Latency */}
           <div className="stat-card neutral span-12" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.25rem', maxHeight: '160px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
 
-              {/* Aligned Headers Row */}
               <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: '8px' }}>
                 <div style={{ minWidth: '130px' }} className="stat-label">Server Outages</div>
                 <div style={{ flex: 1, paddingLeft: '1.5rem' }} className="stat-label">Response Time</div>
                 <div style={{ minWidth: '130px', textAlign: 'right' }} className="stat-label">Avg Latency</div>
               </div>
 
-              {/* Content Row */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flex: 1, width: '100%', gap: '2rem' }}>
-                {/* Left Content */}
                 <div style={{ minWidth: '130px' }}>
                   <div className="stat-value" style={{ fontSize: '1.8rem', fontWeight: '800', lineHeight: 1 }}>
                     {(stats.network_outages || 0) + (stats.power_outages || 0)}
@@ -924,32 +790,10 @@ const App = () => {
                   </div>
                 </div>
 
-                {/* Middle Content: Chart */}
                 <div style={{ flex: 1, height: '70px', alignSelf: 'stretch' }}>
-                  <Line
-                    data={chartData}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: { legend: { display: false }, tooltip: { enabled: false } },
-                      scales: {
-                        x: { display: false },
-                        y: {
-                          display: true,
-                          grid: { color: 'var(--border)', drawTicks: false },
-                          ticks: {
-                            color: '#8a8278',
-                            font: { size: 7, family: 'DM Mono' },
-                            callback: (val) => `${Math.round(val)}ms`
-                          }
-                        }
-                      },
-                      animation: { duration: 300 }
-                    }}
-                  />
+                  <Line data={latencyChartData} options={responseTimeOptions} />
                 </div>
 
-                {/* Right Content */}
                 <div style={{ textAlign: 'right', minWidth: '130px' }}>
                   <div className="stat-value" style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--accent)', lineHeight: 1 }}>
                     {formatLatency(stats.avg_latency)}
@@ -960,18 +804,18 @@ const App = () => {
             </div>
           </div>
 
-          {/* Bento Card 9: Site Outages Dial */}
+          {/* Card 9: Site Outages Dial */}
           <div className="dial-card span-4">
             <div className="dial-label">Site Outages</div>
             <svg className="dial-svg" width="180" height="120" viewBox="0 0 200 130">
-              <path d="M30,120 A70,70,0,0,1,170,120" fill="none" stroke="var(--surface3)" stroke-width="12" stroke-linecap="round" />
-              <path d="M30,120 A70,70,0,0,1,170,120" fill="none" stroke="var(--down)" stroke-width="12" stroke-linecap="round" strokeDasharray={arc} style={getDialStyle((stats.total_outages / 28) * 100)} />
+              <path d="M30,120 A70,70,0,0,1,170,120" fill="none" stroke="var(--surface3)" strokeWidth="12" strokeLinecap="round" />
+              <path d="M30,120 A70,70,0,0,1,170,120" fill="none" stroke="var(--down)" strokeWidth="12" strokeLinecap="round" strokeDasharray={arc} style={getDialStyle((stats.total_outages / 28) * 100)} />
               <text x="100" y="115" textAnchor="middle" fontFamily="Syne,sans-serif" fontSize="22" fontWeight="800" fill="var(--text)">{stats.total_outages}</text>
-              <text x="100" y="130" textAnchor="middle" fontFamily="DM Moto,sans-serif" fontSize="8" fill="var(--text2)">last 24h</text>
+              <text x="100" y="130" textAnchor="middle" fontFamily="DM Mono,sans-serif" fontSize="8" fill="var(--text2)">last 24h</text>
             </svg>
           </div>
 
-          {/* Bento Card 10: Network Throughput Graph */}
+          {/* Card 10: Network Throughput */}
           <div className="panel bento-card span-4" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div>
               <div className="stat-label" style={{ marginBottom: '6px' }}>Network Throughput</div>
@@ -999,24 +843,8 @@ const App = () => {
                 data={{
                   labels: netHistory.map(h => h.time),
                   datasets: [
-                    {
-                      label: 'Download',
-                      data: netHistory.map(h => h.rx),
-                      borderColor: '#2fa87e',
-                      borderWidth: 1.5,
-                      pointRadius: 0,
-                      tension: 0.3,
-                      fill: false
-                    },
-                    {
-                      label: 'Upload',
-                      data: netHistory.map(h => h.tx),
-                      borderColor: '#c84b2f',
-                      borderWidth: 1.5,
-                      pointRadius: 0,
-                      tension: 0.3,
-                      fill: false
-                    }
+                    { label: 'Download', data: netHistory.map(h => h.rx), borderColor: '#2fa87e', borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false },
+                    { label: 'Upload', data: netHistory.map(h => h.tx), borderColor: '#c84b2f', borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false }
                   ]
                 }}
                 options={{
@@ -1024,15 +852,15 @@ const App = () => {
                   maintainAspectRatio: false,
                   plugins: { legend: { display: false }, tooltip: { enabled: false } },
                   scales: {
-                    x: { display: false },
-                    y: { display: false }
+                    x: { display: false, border: { color: 'transparent' } },
+                    y: { display: false, border: { color: 'transparent' } }
                   }
                 }}
               />
             </div>
           </div>
 
-          {/* Bento Card 11: Server Connectivity (Replaced System Uptime Trend) */}
+          {/* Card 11: Server Connectivity */}
           <div className="panel span-4">
             <div className="panel-header">
               <span className="panel-title">Server Connectivity</span>
@@ -1043,7 +871,7 @@ const App = () => {
             </div>
           </div>
 
-          {/* Active Processes — Full width span-12 block directly below the charts but above sites list */}
+          {/* Active Processes */}
           <div className="panel span-12" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div className="panel-header" style={{ padding: '1.25rem 1.25rem 0.5rem 1.25rem', borderBottom: 'none' }}>
               <span className="panel-title">Active Processes</span>
@@ -1085,7 +913,7 @@ const App = () => {
             </div>
           </div>
 
-          {/* Monitored Sites List — Full width span-12 card */}
+          {/* Monitored Sites List */}
           <div className="panel span-12">
             <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -1101,11 +929,7 @@ const App = () => {
               </div>
               <button
                 className="btn btn-accent"
-                onClick={() => {
-                  setEditingSite(null);
-                  setNewSite({ name: '', url: '', icon: '' });
-                  setIsModalOpen(true);
-                }}
+                onClick={() => { setEditingSite(null); setNewSite({ name: '', url: '', icon: '' }); setIsModalOpen(true); }}
                 style={{ padding: '4px 10px', fontSize: '0.75rem' }}
               >
                 + Add Site
@@ -1126,7 +950,8 @@ const App = () => {
               ) : (
                 safeSites.map(site => site && (
                   <div key={site.id} className="site-row clickable" onClick={() => site.url && window.open(site.url, '_blank')}>
-                    <div className={`status-dot ${site.status === 'success' ? 'online' : site.status === 'lan_up' ? 'lan' : site.status === 'slow' ? 'degraded' : 'offline'}`} title={site.status === 'lan_up' ? 'Reachable via LAN' : site.status === 'slow' ? 'Degraded' : site.status === 'success' ? 'Online' : 'Offline'}></div>
+                    <div className={`status-dot ${site.status === 'success' ? 'online' : site.status === 'lan_up' ? 'lan' : site.status === 'slow' ? 'degraded' : 'offline'}`}
+                      title={site.status === 'lan_up' ? 'Reachable via LAN' : site.status === 'slow' ? 'Degraded' : site.status === 'success' ? 'Online' : 'Offline'}></div>
                     <div>
                       <div className="site-name">
                         <Icon name={site.icon} size={18} style={{ marginRight: '8px', color: 'var(--text2)' }} />
@@ -1138,11 +963,7 @@ const App = () => {
                           {site.history.slice(-20).map((h, i) => (
                             <div
                               key={i}
-                              className={`history-dot ${h?.status === 'success' ? 'dot-up' :
-                                h?.status === 'slow' ? 'dot-slow' :
-                                  h?.status === 'lan_up' ? 'dot-up' :
-                                    h ? 'dot-down' : 'dot-unknown'
-                                }`}
+                              className={`history-dot ${h?.status === 'success' ? 'dot-up' : h?.status === 'slow' ? 'dot-slow' : h?.status === 'lan_up' ? 'dot-up' : h ? 'dot-down' : 'dot-unknown'}`}
                               title={h?.status || 'unknown'}
                             />
                           ))}
@@ -1181,7 +1002,7 @@ const App = () => {
             </div>
           </div>
 
-          {/* Bento Card 16: Drives Monitoring */}
+          {/* Drives Monitoring */}
           <div className="panel bento-card span-12">
             <div className="stat-label" style={{ marginBottom: '1.25rem' }}>Drives Monitoring</div>
             <div className="drives-grid">
@@ -1206,11 +1027,7 @@ const App = () => {
                         <div className="drive-updated">Last Updated on {drive.last_updated}</div>
                       </div>
                       <div className="drive-status-small" style={{ color: isFailed ? 'var(--down)' : 'var(--up)' }}>
-                        {isFailed ? (
-                          <AlertTriangle size={16} strokeWidth={2.0} />
-                        ) : (
-                          <Check size={16} strokeWidth={2.5} />
-                        )}
+                        {isFailed ? <AlertTriangle size={16} strokeWidth={2.0} /> : <Check size={16} strokeWidth={2.5} />}
                       </div>
                     </div>
 
@@ -1236,18 +1053,13 @@ const App = () => {
                                 const cap = drive.capacity;
                                 if (!cap) return 'N/A';
                                 const match = cap.match(/^([\d.]+)\s*([a-zA-Z]+)$/);
-                                if (match) {
-                                  return `${Math.round(parseFloat(match[1]))} ${match[2]}`;
-                                }
+                                if (match) return `${Math.round(parseFloat(match[1]))} ${match[2]}`;
                                 return cap;
                               })()}
                             </span>
                             {usedPct >= 0 && (
                               <div className="drive-storage-bar">
-                                <div
-                                  className="drive-storage-fill"
-                                  style={{ width: `${Math.round(usedPct)}%`, background: diskColor }}
-                                />
+                                <div className="drive-storage-fill" style={{ width: `${Math.round(usedPct)}%`, background: diskColor }} />
                               </div>
                             )}
                             {usedPct >= 0 && <span style={{ fontSize: '0.55rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>{Math.round(usedPct)}% used</span>}
@@ -1272,16 +1084,12 @@ const App = () => {
         <div className="modal-overlay open" onClick={(e) => e.target.className.includes('modal-overlay') && setIsModalOpen(false)}>
           <div className="modal">
             <h2>{editingSite ? 'Edit site' : 'Add a site'}</h2>
-            <p>{editingSite ? 'Update the name or URL.' : 'Enter a name and URL — we\'ll check it every minute.'}</p>
+            <p>{editingSite ? 'Update the name or URL.' : "Enter a name and URL — we'll check it every minute."}</p>
             <div className="form-group">
               <label>Select Icon</label>
               <div className="icon-grid">
                 {ICONS.map(icon => (
-                  <button
-                    key={icon}
-                    className={`icon-btn ${newSite.icon === icon ? 'active' : ''}`}
-                    onClick={() => setNewSite({ ...newSite, icon })}
-                  >
+                  <button key={icon} className={`icon-btn ${newSite.icon === icon ? 'active' : ''}`} onClick={() => setNewSite({ ...newSite, icon })}>
                     <Icon name={icon} size={20} />
                   </button>
                 ))}
@@ -1289,21 +1097,11 @@ const App = () => {
             </div>
             <div className="form-group">
               <label>Site Name</label>
-              <input
-                type="text"
-                value={newSite.name}
-                onChange={(e) => setNewSite({ ...newSite, name: e.target.value })}
-                placeholder="e.g. My Portfolio"
-              />
+              <input type="text" value={newSite.name} onChange={(e) => setNewSite({ ...newSite, name: e.target.value })} placeholder="e.g. My Portfolio" />
             </div>
             <div className="form-group">
               <label>URL</label>
-              <input
-                type="url"
-                value={newSite.url}
-                onChange={(e) => setNewSite({ ...newSite, url: e.target.value })}
-                placeholder="https://example.com"
-              />
+              <input type="url" value={newSite.url} onChange={(e) => setNewSite({ ...newSite, url: e.target.value })} placeholder="https://example.com" />
             </div>
             <div className="modal-actions">
               <button className="btn" onClick={() => { setIsModalOpen(false); setEditingSite(null); setNewSite({ name: '', url: '', icon: 'Globe' }); }}>Cancel</button>
@@ -1320,12 +1118,7 @@ const App = () => {
             <p>Assign a custom friendly name to device <strong>{renameDevice}</strong>.</p>
             <div className="form-group">
               <label>Custom Name</label>
-              <input
-                type="text"
-                value={renameVal}
-                onChange={(e) => setRenameVal(e.target.value)}
-                placeholder="e.g. SSD Storage"
-              />
+              <input type="text" value={renameVal} onChange={(e) => setRenameVal(e.target.value)} placeholder="e.g. SSD Storage" />
             </div>
             <div className="modal-actions">
               <button className="btn" onClick={() => setIsRenameModalOpen(false)}>Cancel</button>
@@ -1339,5 +1132,3 @@ const App = () => {
 };
 
 export default App;
-
-
