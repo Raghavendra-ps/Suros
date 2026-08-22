@@ -413,9 +413,9 @@ header {
 }
 .outage-wrap { display: inline-block; }
 
-.settings-icon-btn {
+.header-icon-btn {
   background: transparent;
-  border: 1px solid var(--border);
+  border: none;
   border-radius: 4px;
   color: var(--text3);
   cursor: pointer;
@@ -423,12 +423,12 @@ header {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s;
+  transition: color 0.15s, opacity 0.15s;
+  opacity: 0.85;
 }
-.settings-icon-btn:hover {
-  background: var(--surface2);
+.header-icon-btn:hover {
   color: var(--text2);
-  border-color: var(--text2);
+  opacity: 1;
 }
 
 /* ── Settings Drawer Slide-out ── */

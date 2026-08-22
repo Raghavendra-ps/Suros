@@ -503,16 +503,16 @@ const App = () => {
             verticalAlign: 'middle'
           }}>SUROS</span>
         </div>
-        <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <button className="theme-toggle-btn" onClick={toggleTheme} title="Toggle Theme" style={{ background: 'none', border: 'none', color: 'var(--text2)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}>
-            {theme === 'dark' ? <Moon size={20} /> : <Sun size={20} />}
+        <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button className="header-icon-btn" onClick={toggleTheme} title="Toggle Theme">
+            {theme === 'dark' ? <Moon size={20} strokeWidth={1.5} /> : <Sun size={20} strokeWidth={1.5} />}
           </button>
           <button
-            className="settings-icon-btn"
+            className="header-icon-btn"
             onClick={toggleSettings}
             title="Open Settings"
           >
-            <Settings size={20} />
+            <Settings size={20} strokeWidth={1.5} />
           </button>
         </div>
       </header>
@@ -1192,7 +1192,7 @@ const App = () => {
                   : { borderRight: `5px solid ${diskColor}`, borderLeft: '1px solid var(--border)' };
                 return (
                   <div key={idx} className={`drive-card ${isFailed ? 'failed' : ''}`} style={borderStyle}>
-                    <div className="drive-header-row">
+                    <div className="drive-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div className="drive-title-area">
                         <div className="drive-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span>{drive.device} - {drive.model}</span>
@@ -1202,14 +1202,21 @@ const App = () => {
                         </div>
                         <div className="drive-updated">Last Updated on {drive.last_updated}</div>
                       </div>
+                      <div className="drive-status-small" style={{ color: isFailed ? 'var(--down)' : 'var(--up)' }}>
+                        {isFailed ? (
+                          <AlertTriangle size={16} strokeWidth={2.0} />
+                        ) : (
+                          <Check size={16} strokeWidth={2.5} />
+                        )}
+                      </div>
                     </div>
 
                     <div className="drive-body-row">
                       <div className="drive-metrics-grid">
                         <div className="drive-metric-col">
                           <span className="drive-metric-label">S.M.A.R.T</span>
-                          <span className={`drive-smart-pill ${isFailed ? 'failed' : 'ok'}`}>
-                            {isFailed ? 'Failed' : 'Passed'}
+                          <span className="drive-metric-value" style={{ color: isFailed ? 'var(--down)' : 'var(--up)', fontWeight: '600', fontSize: '1.15rem' }}>
+                            {isFailed ? 'FAILED' : 'PASSED'}
                           </span>
                         </div>
                         <div className="drive-metric-col">
@@ -1237,14 +1244,6 @@ const App = () => {
                           <span className="drive-metric-label">Powered On</span>
                           <span className="drive-metric-value">{drive.powered_on}</span>
                         </div>
-                      </div>
-
-                      <div className="drive-status-icon-wrapper">
-                        {isFailed ? (
-                          <AlertTriangle size={20} strokeWidth={2.5} fill="rgba(200, 75, 47, 0.1)" />
-                        ) : (
-                          <Check size={20} strokeWidth={3} />
-                        )}
                       </div>
                     </div>
                   </div>
