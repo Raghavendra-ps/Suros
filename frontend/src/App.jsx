@@ -1228,16 +1228,26 @@ const App = () => {
                         <div className="drive-metric-col">
                           <span className="drive-metric-label">Capacity</span>
                           <div>
-                            <span className="drive-metric-value">{drive.capacity}</span>
+                            <span className="drive-metric-value">
+                              {(() => {
+                                const cap = drive.capacity;
+                                if (!cap) return 'N/A';
+                                const match = cap.match(/^([\d.]+)\s*([a-zA-Z]+)$/);
+                                if (match) {
+                                  return `${Math.round(parseFloat(match[1]))} ${match[2]}`;
+                                }
+                                return cap;
+                              })()}
+                            </span>
                             {usedPct > 0 && (
                               <div className="drive-storage-bar">
                                 <div
                                   className="drive-storage-fill"
-                                  style={{ width: `${usedPct}%`, background: diskColor }}
+                                  style={{ width: `${Math.round(usedPct)}%`, background: diskColor }}
                                 />
                               </div>
                             )}
-                            {usedPct > 0 && <span style={{ fontSize: '0.55rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>{usedPct}% used</span>}
+                            {usedPct > 0 && <span style={{ fontSize: '0.55rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>{Math.round(usedPct)}% used</span>}
                           </div>
                         </div>
                         <div className="drive-metric-col">
