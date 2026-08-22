@@ -149,11 +149,161 @@ async def send_email_resend(api_key: str, recipient: str, subject: str, body: st
     except Exception as e:
         return False, str(e)
 
+def build_html_email(subject, message):
+    # Determine color theme based on event severity
+    is_restored = "restored" in subject.lower() or "recovered" in subject.lower() or "success" in subject.lower()
+    accent_color = "#2fa87e" if is_restored else "#c84b2f"
+    status_label = "RECOVERY" if is_restored else "ALERT"
+
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>{subject}</title>
+      <style>
+        body {{
+          background-color: #0f0e0d;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          margin: 0;
+          padding: 40px 20px;
+          color: #f2ede4;
+        }}
+        .container {{
+          max-width: 600px;
+          margin: 0 auto;
+          background-color: #1a1816;
+          border: 1px solid #332e28;
+          border-left: 5px solid {accent_color};
+          border-radius: 4px;
+          padding: 32px;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+        }}
+        .header {{
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          border-bottom: 1px solid #332e28;
+          padding-bottom: 16px;
+          margin-bottom: 24px;
+        }}
+        .badge {{
+          font-family: "SF Mono", "DM Mono", monospace;
+          font-size: 10px;
+          font-weight: bold;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          background-color: {accent_color}22;
+          color: {accent_color};
+          padding: 4px 10px;
+          border-radius: 2px;
+          border: 1px solid {accent_color}44;
+        }}
+        .title {{
+          font-size: 20px;
+          font-weight: 800;
+          color: #f2ede4;
+          margin: 0 0 16px 0;
+        }}
+        .message {{
+          font-size: 14px;
+          line-height: 1.6;
+          color: #8a8278;
+          margin-bottom: 24px;
+        }}
+        .meta-box {{
+          background-color: #221f1c;
+          border: 1px solid #332e28;
+          border-radius: 2px;
+          padding: 16px;
+          font-family: "SF Mono", "DM Mono", monospace;
+          font-size: 12px;
+          color: #8a8278;
+        }}
+        .meta-row {{
+          display: flex;
+          justify-content: space-between;
+          padding: 4px 0;
+        }}
+        .meta-label {{
+          color: #55504a;
+        }}
+        .footer {{
+          margin-top: 32px;
+          text-align: center;
+          font-size: 11px;
+          color: #55504a;
+          border-top: 1px solid #332e28;
+          padding-top: 16px;
+        }}
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <span style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-weight: 800; font-size: 14px; color: #f2ede4;">ODYSSEY</span>
+          <span class="badge">{status_label}</span>
+        </div>
+        <h2 class="title">{subject}</h2>
+        <div class="message">
+          {message}
+        </div>
+        <div class="meta-box">
+          <div class="meta-row">
+            <span class="meta-label">Time</span>
+            <span>{datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">Source</span>
+            <span>Odyssey Monitor</span>
+          </div>
+        </div>
+        <div class="footer">
+          Odyssey Dashboard • Automated Alert System
+        </div>
+      </div>
+    </body>
+    </html>
+    """
+    return html
+
+async def send_email_resend(api_key, recipient, subject, body):
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    html_content = build_html_email(subject, body)
+    
+    data = {
+        "from": "Odyssey Alerts <alerts@resend.dev>",
+        "to": recipient,
+        "subject": subject,
+        "html": html_content,
+        "text": body
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post("https://api.resend.com/emails", json=data, headers=headers, timeout=5.0)
+            if resp.status_code >= 200 and resp.status_code < 300:
+                return True, None
+            return False, resp.text
+    except Exception as e:
+        return False, str(e)
+
 def _send_smtp_sync(smtp_server, smtp_port, username, password, recipient, subject, body):
-    msg = MIMEText(body, 'plain', 'utf-8')
+    from email.mime.multipart import MIMEMultipart
+    
+    msg = MIMEMultipart('alternative')
     msg['Subject'] = Header(subject, 'utf-8')
     msg['From'] = username
     msg['To'] = recipient
+    
+    # Attach both plain text and HTML versions
+    part1 = MIMEText(body, 'plain', 'utf-8')
+    part2 = MIMEText(build_html_email(subject, body), 'html', 'utf-8')
+    msg.attach(part1)
+    msg.attach(part2)
     
     server = None
     try:
@@ -241,11 +391,16 @@ async def send_ntfy_alert(settings, title, message):
 
     logger.info(f"ntfy: posting to {url}")
 
+    # Determine tags and priorities based on subject/title
+    is_restored = any(x in title.lower() for x in ["restored", "recovered", "success", "back online"])
+    tags = "white_check_mark,green_heart" if is_restored else "warning,rotating_light"
+    priority = "3" if is_restored else "5" # 3 = default, 5 = max/urgent
+
     headers = {
         "Title": title,
         "Content-Type": "text/plain",
-        "Tags": "bell",
-        "Priority": "default",
+        "Tags": tags,
+        "Priority": priority,
     }
     if settings.ntfy_token:
         headers["Authorization"] = f"Bearer {settings.ntfy_token.strip()}"
