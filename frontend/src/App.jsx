@@ -192,7 +192,7 @@ const App = () => {
       clearInterval(metricsInterval);
       clearInterval(procInterval);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Separate effect purely to update the "checked Xs ago" label
@@ -262,10 +262,10 @@ const App = () => {
   const handleLogoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
+
     const formData = new FormData();
     formData.append('file', file);
-    
+
     try {
       const response = await fetch('/api/upload-logo', {
         method: 'POST',
@@ -333,16 +333,16 @@ const App = () => {
   const safeSites = Array.isArray(sites) ? sites : [];
   const safeSystemHistory = Array.isArray(systemHistory) ? systemHistory : [];
 
-  const chartLabels = (safeSites.length > 0 && Array.isArray(safeSites[0]?.history)) 
-    ? safeSites[0].history.map(h => h ? new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' }) : '') 
+  const chartLabels = (safeSites.length > 0 && Array.isArray(safeSites[0]?.history))
+    ? safeSites[0].history.map(h => h ? new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' }) : '')
     : [];
 
   const chartData = {
     labels: chartLabels,
     datasets: [{
       label: 'Avg Latency (ms)',
-      data: (safeSites.length > 0 && Array.isArray(safeSites[0]?.history)) 
-        ? safeSites[0].history.map(h => h ? h.latency : 0) 
+      data: (safeSites.length > 0 && Array.isArray(safeSites[0]?.history))
+        ? safeSites[0].history.map(h => h ? h.latency : 0)
         : [],
       borderColor: '#c84b2f',
       backgroundColor: 'rgba(200,75,47,0.07)',
@@ -385,13 +385,13 @@ const App = () => {
       }
     },
     scales: {
-      x: { 
-        grid: { color: 'rgba(200,200,200,0.05)', display: false }, 
-        ticks: { 
-          color: '#55504a', 
-          font: { family: 'DM Mono', size: 9 }, 
+      x: {
+        grid: { color: 'rgba(200,200,200,0.05)', display: false },
+        ticks: {
+          color: '#55504a',
+          font: { family: 'DM Mono', size: 9 },
           maxTicksLimit: 24,
-          callback: function(value, index, values) {
+          callback: function (value, index, values) {
             const label = this.getLabelForValue(value);
             // Only show labels for 00:00, 06:00, 12:00, 18:00
             if (label === '00:00' || label === '06:00' || label === '12:00' || label === '18:00') {
@@ -399,12 +399,12 @@ const App = () => {
             }
             return null;
           }
-        } 
+        }
       },
-      y: { 
-        grid: { color: 'rgba(200,200,200,0.05)' }, 
-        ticks: { color: '#55504a', font: { family: 'DM Mono', size: 9 }, padding: 8 }, 
-        beginAtZero: true 
+      y: {
+        grid: { color: 'rgba(200,200,200,0.05)' },
+        ticks: { color: '#55504a', font: { family: 'DM Mono', size: 9 }, padding: 8 },
+        beginAtZero: true
       }
     }
   };
@@ -495,9 +495,9 @@ const App = () => {
           <span className="logo-text">{customName || 'Odyssey'}</span>
         </div>
         <div className="header-right">
-          <button 
-            className="settings-icon-btn" 
-            onClick={toggleSettings} 
+          <button
+            className="settings-icon-btn"
+            onClick={toggleSettings}
             title="Open Settings"
           >
             <Settings size={20} />
@@ -509,30 +509,30 @@ const App = () => {
       {settingsOpen && (
         <div className="drawer-backdrop" onClick={() => setSettingsOpen(false)}></div>
       )}
-      
+
       {/* Settings Drawer Panel */}
       <div className={`settings-drawer ${settingsOpen ? 'open' : ''}`}>
         <div className="drawer-header">
-          <h2>Settings Panel</h2>
+          <h2>Settings</h2>
           <button className="close-btn" onClick={() => setSettingsOpen(false)}>✕</button>
         </div>
-        
+
         <div className="drawer-split-layout">
           {/* LEFT SIDE: Category Sidebar Selector */}
           <div className="drawer-sidebar">
-            <button 
+            <button
               className={`sidebar-tab-btn ${activeSettingsTab === 'general' ? 'active' : ''}`}
               onClick={() => setActiveSettingsTab('general')}
             >
               General Settings
             </button>
-            <button 
+            <button
               className={`sidebar-tab-btn ${activeSettingsTab === 'email' ? 'active' : ''}`}
               onClick={() => setActiveSettingsTab('email')}
             >
               Email Alerts
             </button>
-            <button 
+            <button
               className={`sidebar-tab-btn ${activeSettingsTab === 'ntfy' ? 'active' : ''}`}
               onClick={() => setActiveSettingsTab('ntfy')}
             >
@@ -545,17 +545,17 @@ const App = () => {
             {activeSettingsTab === 'general' && (
               <div className="settings-section-fields">
                 <h3>General Settings</h3>
-                
+
                 <div className="form-group">
                   <label>Dashboard Name</label>
-                  <input 
-                    type="text" 
-                    value={draftSettings.dashboard_name || ''} 
+                  <input
+                    type="text"
+                    value={draftSettings.dashboard_name || ''}
                     onChange={(e) => setDraftSettings({ ...draftSettings, dashboard_name: e.target.value })}
-                    placeholder="e.g. Odyssey Dashboard" 
+                    placeholder="e.g. Odyssey Dashboard"
                   />
                 </div>
-                
+
                 <div className="form-group">
                   <label>Logo</label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '4px' }}>
@@ -591,22 +591,22 @@ const App = () => {
             {activeSettingsTab === 'email' && (
               <div className="settings-section-fields">
                 <h3>Email Outage Alerts</h3>
-                
+
                 <div className="form-group checkbox-group" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     id="emailEnabledCheck"
-                    checked={draftSettings.email_enabled === 1} 
+                    checked={draftSettings.email_enabled === 1}
                     onChange={(e) => { const v = { ...draftSettings, email_enabled: e.target.checked ? 1 : 0 }; setDraftSettings(v); handleSaveAlertSettings(v); }}
                     style={{ width: 'auto', margin: 0, cursor: 'pointer' }}
                   />
                   <label htmlFor="emailEnabledCheck" style={{ margin: 0, cursor: 'pointer', textTransform: 'none' }}>Enable Email Alerts</label>
                 </div>
-                
+
                 <div className="form-group">
                   <label>Provider</label>
-                  <select 
-                    value={draftSettings.email_provider || 'gmail'} 
+                  <select
+                    value={draftSettings.email_provider || 'gmail'}
                     onChange={(e) => { const v = { ...draftSettings, email_provider: e.target.value }; setDraftSettings(v); handleSaveAlertSettings(v); }}
                   >
                     <option value="gmail">Gmail App Password</option>
@@ -615,68 +615,68 @@ const App = () => {
                     <option value="resend">Resend API</option>
                   </select>
                 </div>
-                
+
                 {draftSettings.email_provider === 'resend' ? (
                   <div className="form-group">
                     <label>Resend API Key</label>
-                    <input 
-                      type="password" 
-                      value={draftSettings.email_password || ''} 
+                    <input
+                      type="password"
+                      value={draftSettings.email_password || ''}
                       onChange={(e) => setDraftSettings({ ...draftSettings, email_password: e.target.value })}
-                      placeholder="re_..." 
+                      placeholder="re_..."
                     />
                   </div>
                 ) : (
                   <>
                     <div className="form-group">
                       <label>SMTP Username / Email</label>
-                      <input 
-                        type="email" 
-                        value={draftSettings.email_username || ''} 
+                      <input
+                        type="email"
+                        value={draftSettings.email_username || ''}
                         onChange={(e) => setDraftSettings({ ...draftSettings, email_username: e.target.value })}
-                        placeholder="your-email@provider.com" 
+                        placeholder="your-email@provider.com"
                       />
                     </div>
                     <div className="form-group">
                       <label>SMTP Password / App Password</label>
-                      <input 
-                        type="password" 
-                        value={draftSettings.email_password || ''} 
+                      <input
+                        type="password"
+                        value={draftSettings.email_password || ''}
                         onChange={(e) => setDraftSettings({ ...draftSettings, email_password: e.target.value })}
-                        placeholder="••••••••••••••••" 
+                        placeholder="••••••••••••••••"
                       />
                     </div>
                     <div className="form-group">
                       <label>Custom SMTP Server (optional)</label>
-                      <input 
-                        type="text" 
-                        value={draftSettings.email_smtp_server || ''} 
+                      <input
+                        type="text"
+                        value={draftSettings.email_smtp_server || ''}
                         onChange={(e) => setDraftSettings({ ...draftSettings, email_smtp_server: e.target.value })}
-                        placeholder="smtp.provider.com" 
+                        placeholder="smtp.provider.com"
                       />
                     </div>
                     <div className="form-group">
                       <label>SMTP Port (optional)</label>
-                      <input 
-                        type="number" 
-                        value={draftSettings.email_smtp_port || 587} 
+                      <input
+                        type="number"
+                        value={draftSettings.email_smtp_port || 587}
                         onChange={(e) => setDraftSettings({ ...draftSettings, email_smtp_port: parseInt(e.target.value) || 587 })}
-                        placeholder="587" 
+                        placeholder="587"
                       />
                     </div>
                   </>
                 )}
-                
+
                 <div className="form-group">
                   <label>Recipient Address</label>
-                  <input 
-                    type="email" 
-                    value={draftSettings.email_recipient || ''} 
+                  <input
+                    type="email"
+                    value={draftSettings.email_recipient || ''}
                     onChange={(e) => setDraftSettings({ ...draftSettings, email_recipient: e.target.value })}
-                    placeholder="notifications@recipient.com" 
+                    placeholder="notifications@recipient.com"
                   />
                 </div>
-                
+
                 <div className="settings-save-row">
                   <button className="btn btn-accent" onClick={handleSaveDraft} disabled={saveStatus === 'saving'}>
                     {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? '✓ Saved' : saveStatus === 'error' ? '✗ Error' : 'Save Changes'}
@@ -692,45 +692,45 @@ const App = () => {
             {activeSettingsTab === 'ntfy' && (
               <div className="settings-section-fields">
                 <h3>ntfy Push Alerts</h3>
-                
+
                 <div className="form-group checkbox-group" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     id="ntfyEnabledCheck"
-                    checked={draftSettings.ntfy_enabled === 1} 
+                    checked={draftSettings.ntfy_enabled === 1}
                     onChange={(e) => { const v = { ...draftSettings, ntfy_enabled: e.target.checked ? 1 : 0 }; setDraftSettings(v); handleSaveAlertSettings(v); }}
                     style={{ width: 'auto', margin: 0, cursor: 'pointer' }}
                   />
                   <label htmlFor="ntfyEnabledCheck" style={{ margin: 0, cursor: 'pointer', textTransform: 'none' }}>Enable ntfy Alerts</label>
                 </div>
-                
+
                 <div className="form-group">
                   <label>ntfy Server URL</label>
-                  <input 
-                    type="text" 
-                    value={draftSettings.ntfy_url || ''} 
+                  <input
+                    type="text"
+                    value={draftSettings.ntfy_url || ''}
                     onChange={(e) => setDraftSettings({ ...draftSettings, ntfy_url: e.target.value })}
-                    placeholder="https://ntfy.sh" 
+                    placeholder="https://ntfy.sh"
                   />
                 </div>
-                
+
                 <div className="form-group">
                   <label>Topic</label>
-                  <input 
-                    type="text" 
-                    value={draftSettings.ntfy_topic || ''} 
+                  <input
+                    type="text"
+                    value={draftSettings.ntfy_topic || ''}
                     onChange={(e) => setDraftSettings({ ...draftSettings, ntfy_topic: e.target.value })}
-                    placeholder="my-secret-topic" 
+                    placeholder="my-secret-topic"
                   />
                 </div>
-                
+
                 <div className="form-group">
                   <label>Access Token (optional)</label>
-                  <input 
-                    type="password" 
-                    value={draftSettings.ntfy_token || ''} 
+                  <input
+                    type="password"
+                    value={draftSettings.ntfy_token || ''}
                     onChange={(e) => setDraftSettings({ ...draftSettings, ntfy_token: e.target.value })}
-                    placeholder="tk_..." 
+                    placeholder="tk_..."
                   />
                 </div>
 
@@ -750,7 +750,7 @@ const App = () => {
       </div>
       <div className="main">
         <div className="bento-grid">
-          
+
           {/* Bento Card 1: CPU Metrics (Full Length) */}
           <div className="panel bento-card span-12">
             <div className="stat-label" style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -762,7 +762,7 @@ const App = () => {
               {/* Gauge */}
               <div className="cpu-gauge-wrap">
                 <svg className="cpu-gauge-svg" viewBox="0 0 200 115" width="150" height="86">
-                  <path d="M 22,108 A 78,78 0 0 1 178,108" fill="none" stroke="var(--surface3)" strokeWidth="13" strokeLinecap="round"/>
+                  <path d="M 22,108 A 78,78 0 0 1 178,108" fill="none" stroke="var(--surface3)" strokeWidth="13" strokeLinecap="round" />
                   <path
                     d="M 22,108 A 78,78 0 0 1 178,108"
                     fill="none"
@@ -1025,7 +1025,6 @@ const App = () => {
           <div className="panel span-4">
             <div className="panel-header">
               <span className="panel-title">System Uptime Trend</span>
-              <span className="last-check-label">overall accuracy</span>
             </div>
             <div className="chart-wrap" style={{ height: '140px' }}>
               <Line
@@ -1060,13 +1059,13 @@ const App = () => {
                   <span className="panel-title">Monitored Sites</span>
                   <span className="last-check-label">{sites.length} sites</span>
                 </div>
-                <button 
-                  className="btn btn-accent" 
-                  onClick={() => { 
-                    setEditingSite(null); 
-                    setNewSite({ name: '', url: '', icon: '' }); 
-                    setIsModalOpen(true); 
-                  }} 
+                <button
+                  className="btn btn-accent"
+                  onClick={() => {
+                    setEditingSite(null);
+                    setNewSite({ name: '', url: '', icon: '' });
+                    setIsModalOpen(true);
+                  }}
                   style={{ padding: '4px 10px', fontSize: '0.75rem' }}
                 >
                   + Add Site
@@ -1099,12 +1098,11 @@ const App = () => {
                             {site.history.slice(-20).map((h, i) => (
                               <div
                                 key={i}
-                                className={`history-dot ${
-                                  h?.status === 'success' ? 'dot-up' :
+                                className={`history-dot ${h?.status === 'success' ? 'dot-up' :
                                   h?.status === 'slow' ? 'dot-slow' :
-                                  h?.status === 'lan_up' ? 'dot-up' :
-                                  h ? 'dot-down' : 'dot-unknown'
-                                }`}
+                                    h?.status === 'lan_up' ? 'dot-up' :
+                                      h ? 'dot-down' : 'dot-unknown'
+                                  }`}
                                 title={h?.status || 'unknown'}
                               />
                             ))}
@@ -1250,7 +1248,7 @@ const App = () => {
                         <div className="drive-metric-col">
                           <span className="drive-metric-label">S.M.A.R.T</span>
                           <span className={`drive-smart-pill ${isFailed ? 'failed' : 'ok'}`}>
-                            {isFailed ? '✕ Failed' : '✓ Passed'}
+                            {isFailed ? 'Failed' : 'Passed'}
                           </span>
                         </div>
                         <div className="drive-metric-col">
@@ -1293,7 +1291,7 @@ const App = () => {
               })}
             </div>
           </div>
-          
+
         </div>
       </div>
 
