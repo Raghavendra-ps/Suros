@@ -831,21 +831,29 @@ const App = () => {
 
           {/* Bento Card 2: RAM Metrics */}
           <div className="panel bento-card span-4" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div className="stat-label">RAM Metrics</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', margin: '8px 0 2px' }}>
-              <span className="stat-value" style={{ fontSize: '1.8rem', fontWeight: '800' }}>{Math.round(systemMetrics.memory.percent)}%</span>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>{systemMetrics.memory.used} / {systemMetrics.memory.total} GB</span>
+            <div>
+              <div className="stat-label">RAM Metrics</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', margin: '8px 0 2px' }}>
+                <span className="stat-value" style={{ fontSize: '1.8rem', fontWeight: '800' }}>{Math.round(systemMetrics.memory.percent)}%</span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>{systemMetrics.memory.used} / {systemMetrics.memory.total} GB</span>
+              </div>
+              <div className="latency-bar" style={{ height: '5px', margin: '2px 0' }}>
+                <div className="latency-fill" style={{ width: `${Math.round(systemMetrics.memory.percent)}%`, background: systemMetrics.memory.percent > 80 ? 'var(--down)' : 'var(--up)' }}></div>
+              </div>
             </div>
-            <div className="latency-bar" style={{ height: '5px', margin: '2px 0' }}>
-              <div className="latency-fill" style={{ width: `${Math.round(systemMetrics.memory.percent)}%`, background: systemMetrics.memory.percent > 80 ? 'var(--down)' : 'var(--up)' }}></div>
-            </div>
-            <div className="sparkline-wrap">
+            <div className="sparkline-wrap" style={{ height: '80px', marginTop: '6px' }}>
               <Line
-                data={{
-                  labels: ramHistory.map(h => h.time),
-                  datasets: [{ data: ramHistory.map(h => h.value), borderColor: '#e08c2f', borderWidth: 1.5, pointRadius: 0, tension: 0.4, fill: false }]
+                data={memoryChartData}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                  scales: {
+                    x: { display: false },
+                    y: { display: false, min: 0, max: 100 }
+                  },
+                  animation: { duration: 300 }
                 }}
-                options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, scales: { x: { display: false }, y: { display: false } }, animation: { duration: 300 } }}
               />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: 'var(--text3)', marginTop: '4px' }}>
@@ -935,17 +943,42 @@ const App = () => {
             <div className="stat-sub">external only</div>
           </div>
 
-          {/* Bento Card 8: Server Outages */}
-          <div className="stat-card neutral span-3" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          {/* Bento Card 8: Server Outages (Including Avg Latency & Connectivity Graph) */}
+          <div className="stat-card neutral span-3" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.25rem' }}>
             <div>
-              <div className="stat-label">Server Outages</div>
-              <div className="stat-value" style={{ fontSize: '1.8rem', fontWeight: '800' }}>
-                {(stats.network_outages || 0) + (stats.power_outages || 0)}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <div className="stat-label">Server Outages</div>
+                  <div className="stat-value" style={{ fontSize: '1.6rem', fontWeight: '800', lineHeight: 1.2 }}>
+                    {(stats.network_outages || 0) + (stats.power_outages || 0)}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div className="stat-label">Avg Latency</div>
+                  <div className="stat-value" style={{ fontSize: '1.3rem', fontWeight: '800', color: 'var(--accent)', lineHeight: 1.2 }}>
+                    {formatLatency(stats.avg_latency)}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', fontSize: '0.6rem', color: 'var(--text3)', fontFamily: 'DM Mono', marginTop: '6px' }}>
+                <span>Net: {stats.network_outages || 0}</span>
+                <span>Power: {stats.power_outages || 0}</span>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '12px', fontSize: '0.65rem', color: 'var(--text3)', fontFamily: 'DM Mono', borderTop: '1px dashed var(--border)', paddingTop: '6px', marginTop: '6px' }}>
-              <span>Network: {stats.network_outages || 0}</span>
-              <span>Power: {stats.power_outages || 0}</span>
+            <div style={{ height: '55px', marginTop: '8px' }}>
+              <Line
+                data={connectivityChartData}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                  scales: {
+                    x: { display: false },
+                    y: { display: false, min: 0, max: 1.1 }
+                  },
+                  animation: { duration: 300 }
+                }}
+              />
             </div>
           </div>
 
@@ -1021,32 +1054,14 @@ const App = () => {
             </div>
           </div>
 
-          {/* Bento Card 11: System Uptime Trend */}
+          {/* Bento Card 11: Server Connectivity (Replaced System Uptime Trend) */}
           <div className="panel span-4">
             <div className="panel-header">
-              <span className="panel-title">System Uptime Trend</span>
+              <span className="panel-title">Server Connectivity</span>
+              <span className="last-check-label">internet history</span>
             </div>
             <div className="chart-wrap" style={{ height: '140px' }}>
-              <Line
-                data={{
-                  labels: chartLabels,
-                  datasets: [{
-                    label: 'Uptime %',
-                    data: (chartLabels || []).map((_, i) => {
-                      const checkStatuses = safeSites.map(s => (s && Array.isArray(s.history) && s.history[i] && s.history[i].status === 'success'));
-                      const upCount = checkStatuses.filter(v => v).length;
-                      return safeSites.length > 0 ? (upCount / safeSites.length) * 100 : 0;
-                    }),
-                    borderColor: '#11a367',
-                    backgroundColor: 'rgba(17,163,103,0.07)',
-                    borderWidth: 1.5,
-                    pointRadius: 0,
-                    tension: 0.1,
-                    fill: true,
-                  }]
-                }}
-                options={{ ...chartOptions, scales: { ...chartOptions.scales, y: { ...chartOptions.scales.y, min: 0, max: 100, ticks: { ...chartOptions.scales.y.ticks, stepSize: 20 } } } }}
-              />
+              <Line data={connectivityChartData} options={connectivityChartOptions} />
             </div>
           </div>
 
@@ -1140,34 +1155,6 @@ const App = () => {
                 )}
               </div>
             </div>
-
-            {/* Memory and Server Connectivity metrics side by side inside the Left Column */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
-              {/* Memory Pressure */}
-              <div className="panel" style={{ margin: 0 }}>
-                <div className="panel-header">
-                  <span className="panel-title">Memory Pressure</span>
-                  <span className="last-check-label">RAM trend</span>
-                </div>
-                <div className="chart-wrap" style={{ height: '170px' }}>
-                  <Line
-                    data={memoryChartData}
-                    options={{ ...chartOptions, scales: { ...chartOptions.scales, y: { ...chartOptions.scales.y, min: 0, max: 100, ticks: { ...chartOptions.scales.y.ticks, stepSize: 20 } } } }}
-                  />
-                </div>
-              </div>
-
-              {/* Server Connectivity */}
-              <div className="panel" style={{ margin: 0 }}>
-                <div className="panel-header">
-                  <span className="panel-title">Server Connectivity</span>
-                  <span className="last-check-label">internet history</span>
-                </div>
-                <div className="chart-wrap" style={{ height: '170px' }}>
-                  <Line data={connectivityChartData} options={connectivityChartOptions} />
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Right Column (span-4) containing Response Time and Active Processes */}
@@ -1208,10 +1195,15 @@ const App = () => {
                         <td style={{ textAlign: 'right' }}>{proc.mem}M</td>
                         <td className="proc-cpu-cell" style={{ textAlign: 'right', minWidth: '48px' }}>
                           <div
-                            className="proc-cpu-bar"
-                            style={{ width: `${Math.min(proc.cpu, 100)}%`, background: proc.cpu > 20 ? 'var(--down)' : 'var(--up)' }}
+                            className="proc-cpu-fill"
+                            style={{
+                              width: `${Math.min(proc.cpu, 100)}%`,
+                              background: proc.cpu > 50 ? 'rgba(200, 75, 47, 0.15)' : 'rgba(47, 168, 126, 0.15)'
+                            }}
                           />
-                          <span style={{ position: 'relative', zIndex: 1, color: proc.cpu > 20 ? 'var(--down)' : 'var(--up)' }}>{proc.cpu}%</span>
+                          <span style={{ position: 'relative', zIndex: 1, fontWeight: proc.cpu > 10 ? '700' : '400' }}>
+                            {proc.cpu}%
+                          </span>
                         </td>
                       </tr>
                     ))}
