@@ -514,70 +514,43 @@ def check_site_status(url: str):
         import re
         domain = urlparse(url).netloc.split(':')[0]
         is_ip = re.match(r'^(\d{1,3}\.){3}\d{1,3}$', domain)
-        is_local_ip = is_ip or domain in ['localhost', '127.0.0.1', '0.0.0.0']
+        is_local = is_ip or domain in ['localhost', '127.0.0.1', '0.0.0.0'] or domain.endswith('.local') or domain.endswith('.lan')
 
-        if is_local_ip:
-            # LAN Check (IPs) — reachable locally
+        # 1. Try Direct HTTP Request First (Low latency, accurate measurement)
+        try:
+            resp = requests.get(url, timeout=3.5)
+            latency = (time.time() - t0) * 1000
+            
+            # Decide status based on latency & response
+            if resp.status_code < 400:
+                if latency < 100 or is_local:
+                    return "lan_up", latency
+                return "success", latency
+            else:
+                return "success" if not is_local else "lan_up", latency
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout, requests.exceptions.HTTPError):
+            # Direct connection failed
+            pass
+
+        # 2. Connection failed — check if it's a WAN domain and query isitup.org to distinguish local vs global outage
+        if not is_local:
             try:
-                response = requests.get(url, timeout=5)
-                latency = (time.time() - t0) * 1000
-                # Any response means reachable (even 4xx/5xx), mark as LAN
-                return "lan_up", latency
-            except requests.exceptions.ConnectionError:
-                # Connection refused - service is running but not accepting connections
-                # This should still count as LAN reachable, not down
-                return "lan_up", None
-            except requests.exceptions.Timeout:
-                # Timeout - mark as lan_up since it's a local address
-                return "lan_up", None
-            except Exception:
-                # Other errors - still mark as lan_up for local addresses
-                return "lan_up", None
-        else:
-            # WAN Check (Domains) — public internet check via isitup.org
-            try:
-                ext_res = requests.get(f"https://isitup.org/{domain}.json", timeout=3)
+                ext_res = requests.get(f"https://isitup.org/{domain}.json", timeout=2.0)
                 if ext_res.status_code == 200:
                     data = ext_res.json()
                     if data.get('status_code') == 1:
-                        # Domain is up on public internet
-                        try:
-                            l_res = requests.get(url, timeout=2)
-                            latency = (time.time() - t0) * 1000
-                            # If latency < 100ms, treat as local/LAN
-                            if latency is not None and latency < 100:
-                                return "lan_up", latency
-                        except:
-                            latency = None
-                        return "success", latency
+                        # Global is UP but we can't reach it -> Local outage!
+                        return "down", None
                     elif data.get('status_code') == 2:
-                        # Domain is down globally — check local LAN fallback
-                        try:
-                            response = requests.get(url, timeout=5)
-                            if response.status_code < 400:
-                                latency = (time.time() - t0) * 1000
-                                # If latency < 100ms, treat as local/LAN
-                                if latency < 100:
-                                    return "lan_up", latency
-                                return "lan_up", latency
-                        except:
-                            pass
+                        # Global is DOWN -> External/Global outage!
                         return "down", None
             except:
                 pass
 
-            # Final fallback — direct HTTP check
-            response = requests.get(url, timeout=5)
-            latency = (time.time() - t0) * 1000
-            if response.status_code < 400:
-                # If latency < 100ms, treat as local/LAN
-                if latency < 100:
-                    return "lan_up", latency
-                return "success", latency
-            return "down", latency
-
+        return "down", None
     except Exception:
         return "down", None
+
 
 def get_gpu_metrics():
     """Query NVIDIA GPU metrics via nvidia-smi. Returns None if unavailable (no proprietary driver)."""
