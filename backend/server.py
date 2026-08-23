@@ -264,7 +264,7 @@ def build_html_email(subject, message):
           </div>
           <div class="meta-row">
             <span class="meta-label">Source</span>
-            <span>Suros Monitor</span>
+            <span>Suros</span>
           </div>
         </div>
                 <div class="footer">
@@ -656,7 +656,7 @@ async def monitor_sites_task():
                     current_outage_start = None
                 asyncio.create_task(trigger_system_alert(
                     "Host Network Restored",
-                    "The Suros host server network connection is back ONLINE."
+                    "The host server network connection is back ONLINE."
                 ))
 
             if not server_online and last_network_online:
@@ -671,7 +671,7 @@ async def monitor_sites_task():
                 current_outage_start = datetime.utcnow()
                 asyncio.create_task(trigger_system_alert(
                     "Host Network Outage",
-                    "The Suros host server network connection is OFFLINE."
+                    "The host server network connection is OFFLINE."
                 ))
 
             last_network_online = server_online
