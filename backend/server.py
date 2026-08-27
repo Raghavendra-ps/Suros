@@ -644,20 +644,24 @@ async def monitor_sites_task():
 
             # Detect network outage transitions
             if server_online and not last_network_online:
-                # Network came back online — close the open outage
+                # Network came back online — close the open outage and send one summary alert
                 if current_outage_type == 'network' and current_outage_start:
+                    outage_started_at = current_outage_start
+                    reconnected_at = datetime.utcnow()
                     open_events = db.query(models.OutageEvent).filter(
                         models.OutageEvent.outage_type == 'network',
                         models.OutageEvent.ended_at.is_(None)
                     ).all()
                     for ev in open_events:
-                        ev.ended_at = datetime.utcnow()
+                        ev.ended_at = reconnected_at
                     current_outage_type = None
                     current_outage_start = None
-                asyncio.create_task(trigger_system_alert(
-                    "Host Network Restored",
-                    "The host server network connection is back ONLINE."
-                ))
+                    asyncio.create_task(trigger_system_alert(
+                        "Host Network Restored",
+                        "System was offline but is back up.\n"
+                        f"Server lost connection on: {outage_started_at.strftime('%Y-%m-%d %H:%M:%S UTC')} & "
+                        f"re-connected at: {reconnected_at.strftime('%Y-%m-%d %H:%M:%S UTC')}"
+                    ))
 
             if not server_online and last_network_online:
                 # Network went offline — start a new outage
@@ -669,10 +673,6 @@ async def monitor_sites_task():
                 db.add(new_outage)
                 current_outage_type = 'network'
                 current_outage_start = datetime.utcnow()
-                asyncio.create_task(trigger_system_alert(
-                    "Host Network Outage",
-                    "The host server network connection is OFFLINE."
-                ))
 
             last_network_online = server_online
 
@@ -703,13 +703,13 @@ async def monitor_sites_task():
                     confirmed_site_outages.add(site.id)
                     asyncio.create_task(trigger_system_alert(
                         f"Site Offline: {site.name}",
-                        f"The site {site.name} ({site.url}) failed three consecutive checks and is considered OFFLINE."
+                        f"The site {site.name} ({site.url}) failed subsequent checks and is OFFLINE."
                     ))
                 elif not is_down and streak['up'] >= 3 and site.id in confirmed_site_outages:
                     confirmed_site_outages.discard(site.id)
                     asyncio.create_task(trigger_system_alert(
                         f"Site Recovered: {site.name}",
-                        f"The site {site.name} ({site.url}) passed three consecutive checks and is back ONLINE. Current status: {status}."
+                        f"The site {site.name} ({site.url}) passed subsequent checks and is back ONLINE. Current status: {status}."
                     ))
 
                 # Add site history entry
