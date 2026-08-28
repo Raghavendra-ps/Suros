@@ -965,11 +965,11 @@ const App = () => {
             <div>
               <div className="stat-label">RAM Metrics</div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', margin: '8px 0 2px' }}>
-                <span className="stat-value" style={{ fontSize: '1.8rem', fontWeight: '800' }}>{Math.round(systemMetrics.memory.percent)}%</span>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>{systemMetrics.memory.used} / {systemMetrics.memory.total} GB</span>
+                <span className="stat-value" style={{ fontSize: '1.8rem', fontWeight: '800' }}>{Math.round(systemMetrics.memory?.percent || 0)}%</span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text3)', fontFamily: 'DM Mono' }}>{systemMetrics.memory?.used || 0} / {systemMetrics.memory?.total || 0} GB</span>
               </div>
               <div className="latency-bar" style={{ height: '5px', margin: '2px 0' }}>
-                <div className="latency-fill" style={{ width: `${Math.round(systemMetrics.memory.percent)}%`, background: systemMetrics.memory.percent < 50 ? 'var(--up)' : systemMetrics.memory.percent < 80 ? 'var(--lan)' : 'var(--down)' }}></div>
+                <div className="latency-fill" style={{ width: `${Math.round(systemMetrics.memory?.percent || 0)}%`, background: (systemMetrics.memory?.percent || 0) < 50 ? 'var(--up)' : (systemMetrics.memory?.percent || 0) < 80 ? 'var(--lan)' : 'var(--down)' }}></div>
               </div>
             </div>
             <div className="sparkline-wrap" style={{ height: '80px', marginTop: '6px' }}>
