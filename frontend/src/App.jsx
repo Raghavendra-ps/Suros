@@ -952,7 +952,7 @@ const App = () => {
 
             </div>
             <div className="cpu-pressure-meta">
-              <span>CPU PRESSURE / 10 MIN AVG</span>
+              <span>CPU PRESSURE</span>
               <strong>{systemMetrics.cpu_pressure == null ? 'N/A' : `${Number(systemMetrics.cpu_pressure).toFixed(2)}%`}</strong>
             </div>
             <div className="cpu-pressure-chart" aria-label="CPU pressure history">
