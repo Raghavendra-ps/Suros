@@ -196,7 +196,16 @@ const App = () => {
   const fetchSystemMetrics = async () => {
     try {
       const res = await axios.get('/api/system-metrics');
-      setSystemMetrics(res.data);
+      setSystemMetrics(prev => ({
+        ...prev,
+        ...res.data,
+        memory: { ...(prev.memory || { percent: 0, used: 0, total: 0 }), ...(res.data.memory || {}) },
+        disk: { ...(prev.disk || { percent: 0, used: 0, total: 0 }), ...(res.data.disk || {}) },
+        total_storage: { ...(prev.total_storage || { total: 0, used: 0, free: 0, percent: 0 }), ...(res.data.total_storage || {}) },
+        temp: { ...(prev.temp || { cpu: null, gpu: null }), ...(res.data.temp || {}) },
+        network_rates: { ...(prev.network_rates || { rx: 0, tx: 0 }), ...(res.data.network_rates || {}) },
+        network_totals: { ...(prev.network_totals || { rx: 0, tx: 0, window_hours: 24 }), ...(res.data.network_totals || {}) }
+      }));
       const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
       if (res.data.network_rates) {
         setNetHistory(prev => {
@@ -268,7 +277,7 @@ const App = () => {
     };
     init();
 
-    const procInterval = setInterval(() => { fetchProcesses(); }, 10000);
+    const procInterval = setInterval(() => { fetchProcesses(); }, pollingRate * 1000);
     const interval = setInterval(() => { fetchSites(); fetchStats(); fetchSystemHistory(); fetchDrives(); }, pollingRate * 1000);
     const metricsInterval = setInterval(() => { fetchSystemMetrics(); }, pollingRate * 1000);
 
