@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+axios.defaults.timeout = 5000;
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import {
@@ -275,16 +276,19 @@ const App = () => {
       await Promise.all([fetchSettings(), fetchSites(), fetchStats(), fetchSystemMetrics(), fetchSystemHistory(), fetchDrives(), fetchProcesses()]);
       setIsLoading(false);
     };
-    init();
-
-    const procInterval = setInterval(() => { fetchProcesses(); }, pollingRate * 1000);
-    const interval = setInterval(() => { fetchSites(); fetchStats(); fetchSystemHistory(); fetchDrives(); }, pollingRate * 1000);
-    const metricsInterval = setInterval(() => { fetchSystemMetrics(); }, pollingRate * 1000);
+    let pollingStopped = false;
+    let pollingTimeout;
+    const pollDashboard = async () => {
+      await Promise.all([fetchSites(), fetchStats(), fetchSystemHistory(), fetchDrives(), fetchProcesses(), fetchSystemMetrics()]);
+      if (!pollingStopped) pollingTimeout = setTimeout(pollDashboard, pollingRate * 1000);
+    };
+    init().then(() => {
+      if (!pollingStopped) pollingTimeout = setTimeout(pollDashboard, pollingRate * 1000);
+    });
 
     return () => {
-      clearInterval(interval);
-      clearInterval(metricsInterval);
-      clearInterval(procInterval);
+      pollingStopped = true;
+      clearTimeout(pollingTimeout);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pollingRate]);
