@@ -495,13 +495,6 @@ const App = () => {
     ? pressureHistory.map(point => point.value)
     : safeSystemHistory.map(point => point?.cpu_pressure ?? 0);
   const pressureMax = Math.max(1, ...pressureValues) * 1.2;
-  const pressureChartOptions = {
-    ...sparklineOptions,
-    scales: {
-      x: { display: false, border: { color: 'transparent' } },
-      y: { display: false, border: { color: 'transparent' }, min: 0, max: pressureMax }
-    }
-  };
 
   // Shared mini sparkline options — no axes, no borders, transparent bg
   const sparklineOptions = {
@@ -513,6 +506,14 @@ const App = () => {
       y: { display: false, border: { color: 'transparent' }, min: 0, max: 100 }
     },
     animation: { duration: 300 }
+  };
+
+  const pressureChartOptions = {
+    ...sparklineOptions,
+    scales: {
+      x: { display: false, border: { color: 'transparent' } },
+      y: { display: false, border: { color: 'transparent' }, min: 0, max: pressureMax }
+    }
   };
 
   const connectivityChartData = {
