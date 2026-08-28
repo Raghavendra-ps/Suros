@@ -1508,6 +1508,21 @@ header {
   height: 42px;
   margin-top: 6px;
 }
+.cpu-pressure-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  color: var(--text3);
+  font: 0.55rem 'DM Mono', monospace;
+  letter-spacing: 0.08em;
+}
+.cpu-pressure-meta strong {
+  color: var(--text2);
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0;
+}
 .network-total-row {
   display: flex;
   justify-content: space-between;

@@ -491,6 +491,18 @@ const App = () => {
     }]
   };
 
+  const pressureValues = pressureHistory.length > 0
+    ? pressureHistory.map(point => point.value)
+    : safeSystemHistory.map(point => point?.cpu_pressure ?? 0);
+  const pressureMax = Math.max(1, ...pressureValues) * 1.2;
+  const pressureChartOptions = {
+    ...sparklineOptions,
+    scales: {
+      x: { display: false, border: { color: 'transparent' } },
+      y: { display: false, border: { color: 'transparent' }, min: 0, max: pressureMax }
+    }
+  };
+
   // Shared mini sparkline options — no axes, no borders, transparent bg
   const sparklineOptions = {
     responsive: true,
@@ -902,8 +914,12 @@ const App = () => {
               </div>
 
             </div>
+            <div className="cpu-pressure-meta">
+              <span>CPU PRESSURE / 10 MIN AVG</span>
+              <strong>{systemMetrics.cpu_pressure == null ? 'N/A' : `${Number(systemMetrics.cpu_pressure).toFixed(2)}%`}</strong>
+            </div>
             <div className="cpu-pressure-chart" aria-label="CPU pressure history">
-              <Line data={pressureChartData} options={sparklineOptions} />
+              <Line data={pressureChartData} options={pressureChartOptions} />
             </div>
           </div>
 
