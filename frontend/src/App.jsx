@@ -20,11 +20,76 @@ const Icon = ({ name, size = 16, ...props }) => {
 };
 
 const ICONS = Object.keys(IconMap);
+const templateDefinitions = [
+  ['host_outage', 'Host Offline'],
+  ['host_recovery', 'Host Recovery'],
+  ['site_outage', 'Site Offline'],
+  ['site_recovery', 'Site Recovery']
+];
+const templateVariables = ['{site_name}', '{site_url}', '{status}', '{offline_at}', '{online_at}'];
+
+const templateMarkup = (value) => String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\{(site_name|site_url|status|offline_at|online_at)\}/g, '<span class="template-inline-token" contenteditable="false">{$1}</span>').replace(/\n/g, '<br>');
+
+const TemplateField = ({ value, onChange, onFocus, onDrop, onDragOver, onDragEnter, onDragLeave, className }) => {
+  const fieldRef = useRef(null);
+
+  const handleKeyDown = (event) => {
+    if (event.key !== 'Backspace' && event.key !== 'Delete') return;
+    const selection = window.getSelection();
+    if (!selection || !selection.isCollapsed) return;
+    const node = selection.anchorNode;
+    const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+    const textOffset = node.nodeType === Node.TEXT_NODE ? selection.anchorOffset : null;
+    const parent = node === fieldRef.current ? fieldRef.current : node.parentElement;
+    const siblings = parent === fieldRef.current ? Array.from(fieldRef.current.childNodes) : [];
+    let token = element?.closest('.template-inline-token');
+    if (!token && siblings.length) {
+      const index = node === fieldRef.current ? selection.anchorOffset : siblings.indexOf(node);
+      const atStart = node === fieldRef.current ? true : textOffset === 0;
+      const atEnd = node === fieldRef.current ? true : textOffset === node.textContent.length;
+      const adjacent = event.key === 'Backspace' ? siblings[index - 1] : siblings[index];
+      if (atStart && event.key === 'Backspace') token = adjacent;
+      if (atEnd && event.key === 'Delete') token = adjacent;
+    }
+    if (!token || !token.classList.contains('template-inline-token')) return;
+    event.preventDefault();
+    token.remove();
+    onChange(fieldRef.current.innerText);
+  };
+
+  useEffect(() => {
+    if (fieldRef.current && fieldRef.current.innerText !== value) {
+      fieldRef.current.innerHTML = templateMarkup(value);
+    }
+  }, [value]);
+
+  return <div
+    ref={fieldRef}
+    className={className}
+    contentEditable
+    suppressContentEditableWarning
+    onFocus={onFocus}
+    onKeyDown={handleKeyDown}
+    onInput={(event) => onChange(event.currentTarget.innerText)}
+    onDrop={onDrop}
+    onDragOver={onDragOver}
+    onDragEnter={onDragEnter}
+    onDragLeave={onDragLeave}
+    dangerouslySetInnerHTML={{ __html: templateMarkup(value) }}
+  />;
+};
 
 const formatLatency = (ms) => {
   if (ms < 1000) return `${Math.round(ms)} ms`;
   if (ms < 10000) return `${(ms / 1000).toFixed(1)}k ms`;
   return `${Math.round(ms / 1000)}k ms`;
+};
+
+const formatBytes = (bytes) => {
+  if (!bytes) return '0 B';
+  const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return `${parseFloat((bytes / Math.pow(1024, index)).toFixed(1))} ${units[index]}`;
 };
 
 const App = () => {
@@ -36,6 +101,7 @@ const App = () => {
   const [processes, setProcesses] = useState([]);
   const [netHistory, setNetHistory] = useState([]);
   const [ramHistory, setRamHistory] = useState([]);
+  const [pressureHistory, setPressureHistory] = useState([]);
   const prevStats = useRef({});
 
   const fetchProcesses = async () => {
@@ -76,6 +142,10 @@ const App = () => {
     ntfy_token: ''
   });
   const [activeSettingsTab, setActiveSettingsTab] = useState('email');
+  const [activeTemplateKey, setActiveTemplateKey] = useState('host_outage');
+  const [focusedTemplateField, setFocusedTemplateField] = useState(null);
+  const [templateDropTarget, setTemplateDropTarget] = useState(null);
+  const [logs, setLogs] = useState({ entries: [] });
   const [testStatus, setTestStatus] = useState(null);
   const [draftSettings, setDraftSettings] = useState({});
   const [saveStatus, setSaveStatus] = useState(null);
@@ -133,6 +203,13 @@ const App = () => {
           return next;
         });
       }
+      if (res.data.cpu_pressure !== null && res.data.cpu_pressure !== undefined) {
+        setPressureHistory(prev => {
+          const next = [...prev, { value: res.data.cpu_pressure, time: t }];
+          if (next.length > 60) next.shift();
+          return next;
+        });
+      }
       setRamHistory(prev => {
         const next = [...prev, { value: res.data.memory?.percent || 0, time: t }];
         if (next.length > 30) next.shift();
@@ -161,6 +238,24 @@ const App = () => {
       setDraftSettings(prev => Object.keys(prev).length === 0 ? res.data : prev);
     } catch (err) {
       console.error('Error fetching settings:', err);
+    }
+  };
+
+  const fetchLogs = async () => {
+    try {
+      const res = await axios.get('/api/logs');
+      setLogs(res.data || { entries: [] });
+    } catch (err) {
+      console.error('Error fetching logs:', err);
+    }
+  };
+
+  const clearLogs = async () => {
+    try {
+      await axios.delete('/api/logs/application');
+      setLogs({ entries: [] });
+    } catch (err) {
+      console.error('Error clearing application logs:', err);
     }
   };
 
@@ -199,6 +294,27 @@ const App = () => {
 
   const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
   const toggleSettings = () => setSettingsOpen(!settingsOpen);
+
+  const insertTemplateVariable = (variable, fieldName = focusedTemplateField, selectionStart = null, selectionEnd = null) => {
+    if (!fieldName) return;
+    const field = `${activeTemplateKey}_${fieldName}`;
+    setDraftSettings(prev => {
+      const current = prev[field] || '';
+      const start = selectionStart ?? current.length;
+      const end = selectionEnd ?? start;
+      return { ...prev, [field]: `${current.slice(0, start)}${variable}${current.slice(end)}` };
+    });
+  };
+
+  const handleTemplateDrop = (event, fieldName) => {
+    event.preventDefault();
+    const variable = event.dataTransfer.getData('text/plain');
+    if (!variable) return;
+    const target = event.currentTarget;
+    setFocusedTemplateField(fieldName);
+    setTemplateDropTarget(null);
+    insertTemplateVariable(variable, fieldName, target.innerText.length, target.innerText.length);
+  };
 
   const handleSaveAlertSettings = async (updatedSettings) => {
     try {
@@ -351,6 +467,24 @@ const App = () => {
       borderColor: '#2fa87e',
       backgroundColor: 'rgba(47,168,126,0.07)',
       borderWidth: 2,
+      pointRadius: 0,
+      tension: 0.3,
+      fill: true,
+    }]
+  };
+
+  const pressureChartData = {
+    labels: pressureHistory.length > 0
+      ? pressureHistory.map(h => h.time)
+      : safeSystemHistory.map(h => h ? new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' }) : ''),
+    datasets: [{
+      label: 'CPU Pressure %',
+      data: pressureHistory.length > 0
+        ? pressureHistory.map(h => h.value)
+        : safeSystemHistory.map(h => h?.cpu_pressure ?? 0),
+      borderColor: '#c84b2f',
+      backgroundColor: 'rgba(200,75,47,0.08)',
+      borderWidth: 1.5,
       pointRadius: 0,
       tension: 0.3,
       fill: true,
@@ -513,13 +647,23 @@ const App = () => {
             >
               ntfy Push Alerts
             </button>
+            <button
+              className={`sidebar-tab-btn ${activeSettingsTab === 'templates' ? 'active' : ''}`}
+              onClick={() => setActiveSettingsTab('templates')}
+            >
+              Templates
+            </button>
+            <button
+              className={`sidebar-tab-btn ${activeSettingsTab === 'logging' ? 'active' : ''}`}
+              onClick={() => { setActiveSettingsTab('logging'); fetchLogs(); }}
+            >
+              Logging
+            </button>
           </div>
 
           <div className="drawer-fields-container">
             {activeSettingsTab === 'email' && (
               <div className="settings-section-fields">
-                <h3>Email Outage Alerts</h3>
-
                 <div className="form-group checkbox-group" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
@@ -587,8 +731,6 @@ const App = () => {
 
             {activeSettingsTab === 'ntfy' && (
               <div className="settings-section-fields">
-                <h3>ntfy Push Alerts</h3>
-
                 <div className="form-group checkbox-group" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
@@ -624,6 +766,62 @@ const App = () => {
                 {testStatus && <div className="test-status-msg">{testStatus}</div>}
               </div>
             )}
+
+            {activeSettingsTab === 'templates' && (
+              <div className="templates-page">
+                <div className="template-palette">
+                  <span className="template-variable-label">DRAG VARIABLES INTO A TEMPLATE FIELD</span>
+                  <div className="template-variable-legend">
+                    {templateVariables.map(variable => (
+                      <button type="button" className="template-token" key={variable} draggable onDragStart={(e) => e.dataTransfer.setData('text/plain', variable)} onClick={() => insertTemplateVariable(variable)}>{variable}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="template-workspace">
+                  <nav className="template-nav" aria-label="Alert templates">
+                    {templateDefinitions.map(([key, label]) => (
+                      <button type="button" className={`template-nav-btn ${activeTemplateKey === key ? 'active' : ''}`} key={key} onClick={() => { setActiveTemplateKey(key); setFocusedTemplateField(null); }}>
+                        <span>{label}</span>
+                      </button>
+                    ))}
+                  </nav>
+                  <div className="template-editor-panel">
+                    {(() => {
+                      const activeTemplate = templateDefinitions.find(([key]) => key === activeTemplateKey) || templateDefinitions[0];
+                      const [key, label] = activeTemplate;
+                      const title = draftSettings[`${key}_title`] || '';
+                      const body = draftSettings[`${key}_body`] || '';
+                      return (
+                        <>
+                          <div className="template-editor-block">
+                            <div className="template-editor-heading"><span>{label.toUpperCase()}</span></div>
+                            <span className="template-field-label">SUBJECT / TITLE</span>
+                            <TemplateField className={`template-input template-edit-block ${templateDropTarget === 'title' ? 'drop-active' : ''}`} value={title} onFocus={() => setFocusedTemplateField('title')} onDragOver={(e) => e.preventDefault()} onDragEnter={() => setTemplateDropTarget('title')} onDragLeave={() => setTemplateDropTarget(null)} onDrop={(e) => handleTemplateDrop(e, 'title')} onChange={(value) => setDraftSettings({ ...draftSettings, [`${key}_title`]: value })} />
+                            <span className="template-field-label">MESSAGE BODY</span>
+                            <TemplateField className={`template-textarea template-edit-block ${templateDropTarget === 'body' ? 'drop-active' : ''}`} value={body} onFocus={() => setFocusedTemplateField('body')} onDragOver={(e) => e.preventDefault()} onDragEnter={() => setTemplateDropTarget('body')} onDragLeave={() => setTemplateDropTarget(null)} onDrop={(e) => handleTemplateDrop(e, 'body')} onChange={(value) => setDraftSettings({ ...draftSettings, [`${key}_body`]: value })} />
+                            <div className="settings-save-row"><button className="btn btn-accent" onClick={handleSaveDraft} disabled={saveStatus === 'saving'}>{saveStatus === 'saved' ? '✓ Saved' : 'Save Templates'}</button></div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeSettingsTab === 'logging' && (
+              <div className="logging-page">
+                <div className="logging-summary">
+                  <span>APPLICATION LOG</span>
+                  <strong>{logs.entries.length} recent entries</strong>
+                </div>
+                <pre className="logging-output">{logs.entries.length ? logs.entries.join('\n') : 'No application log entries yet.'}</pre>
+                <div className="logging-actions">
+                  <button className="btn" onClick={fetchLogs}>Refresh Logs</button>
+                  <button className="btn logging-clear-btn" onClick={clearLogs}>Clear Application Logs</button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -632,7 +830,7 @@ const App = () => {
         <div className="bento-grid">
 
           {/* Card 1: CPU Metrics */}
-          <div className="panel bento-card span-12">
+          <div className="panel bento-card span-12 cpu-metrics-card">
             <div className="stat-label" style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>CPU Metrics</span>
               <span style={{ fontSize: '0.65rem', color: 'var(--text2)', fontFamily: 'DM Mono' }}>{systemMetrics.cpu_name || 'Detecting CPU...'}</span>
@@ -703,6 +901,9 @@ const App = () => {
                 )}
               </div>
 
+            </div>
+            <div className="cpu-pressure-chart" aria-label="CPU pressure history">
+              <Line data={pressureChartData} options={sparklineOptions} />
             </div>
           </div>
 
@@ -836,6 +1037,10 @@ const App = () => {
                   const i = Math.floor(Math.log(bytes) / Math.log(k));
                   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
                 })()}</span>
+              </div>
+              <div className="network-total-row">
+                <span>24H DN: {formatBytes(systemMetrics.network_totals?.rx || 0)}</span>
+                <span>24H UP: {formatBytes(systemMetrics.network_totals?.tx || 0)}</span>
               </div>
             </div>
             <div style={{ height: '70px', marginTop: '8px' }}>

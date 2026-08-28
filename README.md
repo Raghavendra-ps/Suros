@@ -20,11 +20,11 @@ No cloud dependency. No telemetry. Runs entirely on your own hardware.
 ## Features
 
 ### System Monitoring
-- **CPU** — live utilisation gauge, per-core heatmap bars, temperature, pressure label, core/thread count
+- **CPU** — live utilisation gauge, per-core heatmap bars, temperature, CPU pressure graph, core/thread count
 - **RAM** — usage percentage with sparkline history
 - **GPU** — utilisation, VRAM usage, temperature (NVIDIA via `nvidia-smi`)
 - **Storage** — aggregate disk usage across all mounted volumes
-- **Network** — real-time RX/TX throughput with live graph
+- **Network** — real-time RX/TX throughput with live graph and rolling 24-hour transfer totals
 
 ### Site Monitoring
 - Add any HTTP/HTTPS endpoint and poll it every minute
@@ -42,7 +42,14 @@ No cloud dependency. No telemetry. Runs entirely on your own hardware.
 ### Alerting
 - **Email** — Gmail App Password, Outlook, Apple iCloud, or Resend API
 - **ntfy** — push to any self-hosted or public ntfy server with optional auth token
+- Editable templates for host outage/recovery and site outage/recovery alerts
+- Site outage notifications are deduplicated across restarts with a three-hour cooldown and reset after recovery
 - Test connection button built into the settings drawer
+
+### Logging
+- Status checks are appended to one persistent `backend/logs/status.log` file for outage statistics
+- Application diagnostics are written to `backend/logs/app.log`
+- Recent application logs can be viewed and cleared from the Logging settings section
 
 ### UX
 - Dark / light theme toggle, persisted to localStorage
@@ -58,7 +65,7 @@ No cloud dependency. No telemetry. Runs entirely on your own hardware.
 | Layer | Tech |
 |---|---|
 | Frontend | React 18, Chart.js, Recharts, Lucide Icons, Tailwind-adjacent CSS vars |
-| Backend | Python, FastAPI, psutil, smartmontools |
+| Backend | Python, FastAPI, SQLAlchemy, psutil, smartmontools |
 | Fonts | Syne, Lora, DM Mono (Google Fonts) |
 | Deployment | Served via Nginx reverse proxy or `vite preview` |
 
@@ -100,7 +107,7 @@ cd backend
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 8000
+uvicorn server:app --host 0.0.0.0 --port 8000
 ```
 
 ### 3. Frontend
@@ -179,6 +186,9 @@ Settings are persisted to the backend database and survive restarts.
 | `GET` | `/api/settings` | Fetch current alert settings |
 | `PUT` | `/api/settings` | Update alert settings |
 | `POST` | `/api/settings/test-notification` | Send a test alert |
+| `GET` | `/api/logs` | Read recent application log entries |
+| `DELETE` | `/api/logs/application` | Clear application logs only |
+| `GET` | `/health` | Backend health check |
 
 ---
 
@@ -187,9 +197,10 @@ Settings are persisted to the backend database and survive restarts.
 ```
 suros/
 ├── backend/
-│   ├── main.py              # FastAPI app + all routes
+│   ├── server.py            # FastAPI app + all routes
 │   ├── requirements.txt
-│   └── suros.db             # SQLite database (auto-created)
+│   ├── uptime.db            # SQLite database (auto-created, ignored)
+│   └── logs/                # Status and application logs (ignored)
 ├── frontend/
 │   ├── public/
 │   │   ├── suros-logo-dark.png

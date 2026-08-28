@@ -14,6 +14,8 @@ class Site(Base):
     external_status = Column(String, nullable=True)
     last_checked = Column(DateTime, nullable=True)
     outage_count = Column(Integer, default=0)  # external downtime count
+    alert_active = Column(Integer, default=0)
+    last_alert_at = Column(DateTime, nullable=True)
     history = relationship("History", back_populates="site", cascade="all, delete-orphan")
 
 class History(Base):
@@ -34,6 +36,9 @@ class SystemHistory(Base):
     disk = Column(Float)
     gpu = Column(Float, nullable=True)
     network_online = Column(Integer, default=1)  # 1=online, 0=offline
+    cpu_pressure = Column(Float, nullable=True)
+    network_received = Column(Integer, nullable=True)
+    network_sent = Column(Integer, nullable=True)
 
 class OutageEvent(Base):
     __tablename__ = "outage_events"
@@ -59,6 +64,16 @@ class Settings(Base):
     ntfy_url = Column(String, default="https://ntfy.sh")
     ntfy_topic = Column(String, nullable=True)
     ntfy_token = Column(String, nullable=True)
+    host_outage_title = Column(String, default="Host Network Outage")
+    host_outage_body = Column(String, default="The host server network connection is OFFLINE.")
+    host_recovery_title = Column(String, default="Host Network Restored")
+    host_recovery_body = Column(String, default="System was offline but is back up.\nServer lost connection on: {offline_at} & re-connected at: {online_at}")
+    site_outage_title = Column(String, default="Site Offline: {site_name}")
+    site_outage_body = Column(String, default="The site {site_name} ({site_url}) failed subsequent checks and is OFFLINE.")
+    site_recovery_title = Column(String, default="Site Recovered: {site_name}")
+    site_recovery_body = Column(String, default="The site {site_name} ({site_url}) passed subsequent checks and is back ONLINE. Current status: {status}.")
+    test_title = Column(String, default="Test Alert")
+    test_body = Column(String, default="This is a test alert notification from your Suros dashboard.")
 
 class DriveAlias(Base):
     __tablename__ = "drive_aliases"

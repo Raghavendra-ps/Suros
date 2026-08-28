@@ -462,10 +462,42 @@ header {
   transform: translateX(100%);
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
-
-.settings-drawer.open {
-  transform: translateX(0);
-}
+.settings-drawer.open { transform: translateX(0); }
+.templates-page { font-family: 'DM Mono', monospace; }
+.template-variable-label, .template-index { color: var(--accent); font-size: 0.58rem; letter-spacing: 0.12em; }
+.template-palette { padding: 0.2rem 0 0.75rem; }
+.template-variable-legend { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.template-token { padding: 0.3rem 0.45rem; border: 1px solid var(--border); border-radius: 3px; background: var(--surface3); color: var(--accent); cursor: grab; font: 0.6rem 'DM Mono', monospace; user-select: none; }
+.template-token:active { cursor: grabbing; }
+.template-token:hover { border-color: var(--accent); background: rgba(200,75,47,0.08); }
+.template-workspace { display: block; min-height: 0; margin-top: 0.75rem; }
+.template-nav { display: flex; width: 100%; overflow-x: auto; border-bottom: 1px solid var(--border); }
+.template-nav-btn { display: flex; align-items: center; justify-content: center; flex: 1 0 auto; padding: 0.7rem 0.65rem; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text2); cursor: pointer; text-align: left; white-space: nowrap; font: 0.62rem 'DM Mono', monospace; }
+.template-nav-btn:hover { background: transparent; color: var(--text); }
+.template-nav-btn.active { border-bottom-color: var(--accent); background: transparent; color: var(--text); }
+.template-nav-dot { font-size: 0.6rem; line-height: 1; }
+.template-nav-dot.down, .template-preview-dot.down { color: var(--down); }
+.template-nav-dot.up, .template-preview-dot.up { color: var(--up); }
+.template-nav-dot.test, .template-preview-dot.test { color: var(--lan); }
+.template-editor-panel { min-width: 0; overflow: hidden; }
+.template-editor-block, .template-preview-block { padding: 1rem; }
+.template-editor-block { border-bottom: 1px solid var(--border); }
+.template-editor-heading { display: flex; align-items: center; gap: 0.5rem; color: var(--text); font-size: 0.65rem; font-weight: 600; letter-spacing: 0.1em; margin-bottom: 1rem; }
+.template-field-label { display: block; color: var(--text3); font-size: 0.56rem; letter-spacing: 0.1em; margin-bottom: 0.4rem; }
+.template-input, .template-textarea { width: 100%; padding: 0.6rem 0.7rem; margin-bottom: 0.8rem; border: 1px solid var(--border); border-radius: 3px; background: var(--surface3); color: var(--text); outline: none; font: 0.72rem 'DM Mono', monospace; }
+.template-edit-block { min-height: 40px; white-space: pre-wrap; word-break: break-word; cursor: text; }
+.template-textarea.template-edit-block { min-height: 130px; }
+.template-inline-token { display: inline-block; padding: 0.12rem 0.3rem; margin: 0 0.08rem; border: 1px solid rgba(200,75,47,0.45); border-radius: 3px; background: rgba(200,75,47,0.14); color: var(--accent); line-height: 1.35; }
+.template-edit-block.drop-active { border-color: var(--accent); background: rgba(200,75,47,0.1); box-shadow: 0 0 0 2px rgba(200,75,47,0.16); }
+.template-input:focus, .template-textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(200,75,47,0.12); }
+.template-textarea { resize: vertical; line-height: 1.5; }
+.logging-page { font-family: 'DM Mono', monospace; }
+.logging-summary { display: flex; justify-content: space-between; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--border); color: var(--text3); font-size: 0.6rem; letter-spacing: 0.08em; }
+.logging-summary strong { color: var(--text2); font-weight: 400; letter-spacing: 0; }
+.logging-output { max-height: 420px; overflow: auto; margin: 1rem 0; padding: 0.8rem; border: 1px solid var(--border); background: var(--surface2); color: var(--text2); font: 0.62rem/1.6 'DM Mono', monospace; white-space: pre-wrap; word-break: break-word; }
+.logging-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.logging-clear-btn { color: var(--down); border-color: rgba(200,75,47,0.35); }
+.logging-clear-btn:hover { color: var(--down); border-color: var(--down); }
 
 .drawer-header {
   padding: 1.5rem;
@@ -1469,7 +1501,22 @@ header {
   color: var(--text3);
   margin-top: -4px;
 }
-
+.cpu-metrics-card {
+  overflow: hidden;
+}
+.cpu-pressure-chart {
+  height: 42px;
+  margin-top: 6px;
+}
+.network-total-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 5px;
+  color: var(--text3);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.58rem;
+}
 /* ── Core Heatmap Bar Grid ── */
 .core-bar-grid {
   display: flex;

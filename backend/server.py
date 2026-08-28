@@ -22,12 +22,16 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 # --- Logging Setup ---
+os.makedirs("logs", exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger("suros-backend")
+file_handler = logging.FileHandler("logs/app.log")
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logger.addHandler(file_handler)
 
 def get_host_disk_usage(mountpoint):
     host_path = f"/mnt/host{mountpoint}"
@@ -60,7 +64,17 @@ try:
             ("ntfy_enabled", "INTEGER DEFAULT 0"),
             ("ntfy_url", "VARCHAR DEFAULT 'https://ntfy.sh'"),
             ("ntfy_topic", "VARCHAR"),
-            ("ntfy_token", "VARCHAR")
+            ("ntfy_token", "VARCHAR"),
+            ("host_outage_title", "VARCHAR DEFAULT 'Host Network Outage'"),
+            ("host_outage_body", "VARCHAR DEFAULT 'The host server network connection is OFFLINE.'"),
+            ("host_recovery_title", "VARCHAR DEFAULT 'Host Network Restored'"),
+            ("host_recovery_body", "VARCHAR DEFAULT 'System was offline but is back up. Server lost connection on: {offline_at} & re-connected at: {online_at}'"),
+            ("site_outage_title", "VARCHAR DEFAULT 'Site Offline: {site_name}'"),
+            ("site_outage_body", "VARCHAR DEFAULT 'The site {site_name} ({site_url}) failed subsequent checks and is OFFLINE.'"),
+            ("site_recovery_title", "VARCHAR DEFAULT 'Site Recovered: {site_name}'"),
+            ("site_recovery_body", "VARCHAR DEFAULT 'The site {site_name} ({site_url}) passed subsequent checks and is back ONLINE. Current status: {status}.'"),
+            ("test_title", "VARCHAR DEFAULT 'Test Alert'"),
+            ("test_body", "VARCHAR DEFAULT 'This is a test alert notification from your Suros dashboard.'")
         ]
         
         for col_name, col_type in new_columns:
@@ -72,6 +86,36 @@ try:
         conn.close()
     except Exception as em:
         logger.error(f"Migration failed: {em}")
+    try:
+        conn = sqlite3.connect("./uptime.db")
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(system_history)")
+        existing_cols = [row[1] for row in cursor.fetchall()]
+        for col_name, col_type in [
+            ("cpu_pressure", "FLOAT"),
+            ("network_received", "INTEGER"),
+            ("network_sent", "INTEGER")
+        ]:
+            if col_name not in existing_cols:
+                logger.info(f"Migration: Adding column {col_name} to system_history table")
+                cursor.execute(f"ALTER TABLE system_history ADD COLUMN {col_name} {col_type}")
+        conn.commit()
+        conn.close()
+    except Exception as em:
+        logger.error(f"System history migration failed: {em}")
+    try:
+        conn = sqlite3.connect("./uptime.db")
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(sites)")
+        existing_cols = [row[1] for row in cursor.fetchall()]
+        for col_name, col_type in [("alert_active", "INTEGER DEFAULT 0"), ("last_alert_at", "DATETIME")]:
+            if col_name not in existing_cols:
+                logger.info(f"Migration: Adding column {col_name} to sites table")
+                cursor.execute(f"ALTER TABLE sites ADD COLUMN {col_name} {col_type}")
+        conn.commit()
+        conn.close()
+    except Exception as em:
+        logger.error(f"Site alert migration failed: {em}")
 except Exception as e:
     logger.error(f"Database creation error: {e}")
 
@@ -134,6 +178,16 @@ class SettingsSchema(BaseModel):
     ntfy_url: Optional[str] = "https://ntfy.sh"
     ntfy_topic: Optional[str] = None
     ntfy_token: Optional[str] = None
+    host_outage_title: Optional[str] = "Host Network Outage"
+    host_outage_body: Optional[str] = "The host server network connection is OFFLINE."
+    host_recovery_title: Optional[str] = "Host Network Restored"
+    host_recovery_body: Optional[str] = "System was offline but is back up.\nServer lost connection on: {offline_at} & re-connected at: {online_at}"
+    site_outage_title: Optional[str] = "Site Offline: {site_name}"
+    site_outage_body: Optional[str] = "The site {site_name} ({site_url}) failed subsequent checks and is OFFLINE."
+    site_recovery_title: Optional[str] = "Site Recovered: {site_name}"
+    site_recovery_body: Optional[str] = "The site {site_name} ({site_url}) passed subsequent checks and is back ONLINE. Current status: {status}."
+    test_title: Optional[str] = "Test Alert"
+    test_body: Optional[str] = "This is a test alert notification from your Suros dashboard."
 
     class Config:
         from_attributes = True
@@ -441,6 +495,15 @@ async def trigger_system_alert(title: str, message: str):
     finally:
         db.close()
 
+def alert_template(settings, title_field, body_field, default_title, default_body, **values):
+    title = getattr(settings, title_field, None) or default_title
+    body = getattr(settings, body_field, None) or default_body
+    class TemplateValues(dict):
+        def __missing__(self, key):
+            return '{' + key + '}'
+    template_values = TemplateValues(values)
+    return title.format_map(template_values), body.format_map(template_values)
+
 class DriveAliasCreate(BaseModel):
     device: str
     alias: str
@@ -449,7 +512,7 @@ def write_hourly_status_log(network_online: bool):
     try:
         os.makedirs("logs", exist_ok=True)
         now = datetime.now()
-        filename = f"logs/status_{now.strftime('%Y%m%d_%H')}.log"
+        filename = "logs/status.log"
         # Format: timestamp,network_status,power_status
         timestamp = now.isoformat()
         net_status = "online" if network_online else "offline"
@@ -466,7 +529,7 @@ def calculate_outages_from_logs():
         if not os.path.exists("logs"):
             return 0, 0
         
-        files = sorted([f for f in os.listdir("logs") if f.startswith("status_") and f.endswith(".log")])
+        files = ["status.log"] if os.path.exists("logs/status.log") else []
         entries = []
         
         for file in files:
@@ -586,6 +649,19 @@ def get_cpu_temp():
     except Exception:
         return None
 
+def get_cpu_pressure():
+    """Return Linux CPU pressure some.avg10 percentage, or None if unavailable."""
+    for pressure_path in ('/mnt/host/proc/pressure/cpu', '/proc/pressure/cpu'):
+        try:
+            with open(pressure_path, 'r') as pressure_file:
+                for line in pressure_file:
+                    if line.startswith('some '):
+                        values = dict(item.split('=') for item in line.split()[1:])
+                        return float(values['avg10'])
+        except (FileNotFoundError, KeyError, ValueError, OSError):
+            continue
+    return None
+
 # --- Global Metrics Tracking ---
 last_net_sent = psutil.net_io_counters().bytes_sent
 last_net_time = time.time()
@@ -634,6 +710,7 @@ async def monitor_sites_task():
         db = SessionLocal()
         try:
             global last_network_online, current_outage_type, current_outage_start
+            alert_settings = db.query(models.Settings).first()
 
             # Check server internet connectivity
             server_online = await asyncio.to_thread(is_internet_reachable)
@@ -648,6 +725,14 @@ async def monitor_sites_task():
                 if current_outage_type == 'network' and current_outage_start:
                     outage_started_at = current_outage_start
                     reconnected_at = datetime.utcnow()
+                    alert_title, alert_body = alert_template(
+                        alert_settings,
+                        "host_recovery_title", "host_recovery_body",
+                        "Host Network Restored",
+                        "System was offline but is back up.\nServer lost connection on: {offline_at} & re-connected at: {online_at}",
+                        offline_at=outage_started_at.strftime('%Y-%m-%d %H:%M:%S UTC'),
+                        online_at=reconnected_at.strftime('%Y-%m-%d %H:%M:%S UTC')
+                    )
                     open_events = db.query(models.OutageEvent).filter(
                         models.OutageEvent.outage_type == 'network',
                         models.OutageEvent.ended_at.is_(None)
@@ -657,10 +742,8 @@ async def monitor_sites_task():
                     current_outage_type = None
                     current_outage_start = None
                     asyncio.create_task(trigger_system_alert(
-                        "Host Network Restored",
-                        "System was offline but is back up.\n"
-                        f"Server lost connection on: {outage_started_at.strftime('%Y-%m-%d %H:%M:%S UTC')} & "
-                        f"re-connected at: {reconnected_at.strftime('%Y-%m-%d %H:%M:%S UTC')}"
+                        alert_title,
+                        alert_body
                     ))
 
             if not server_online and last_network_online:
@@ -698,19 +781,42 @@ async def monitor_sites_task():
                     streak['up'] += 1
                     streak['down'] = 0
 
-                if is_down and streak['down'] >= 3 and site.id not in confirmed_site_outages:
+                alert_cooldown_expired = (
+                    not site.last_alert_at or
+                    datetime.utcnow() - site.last_alert_at >= timedelta(hours=3)
+                )
+                if is_down and streak['down'] >= 3 and not site.alert_active and alert_cooldown_expired:
                     site.outage_count = (site.outage_count or 0) + 1
+                    site.alert_active = 1
+                    site.last_alert_at = datetime.utcnow()
                     confirmed_site_outages.add(site.id)
+                    alert_title, alert_body = alert_template(
+                        alert_settings,
+                        "site_outage_title", "site_outage_body",
+                        "Site Offline: {site_name}",
+                        "The site {site_name} ({site_url}) failed subsequent checks and is OFFLINE.",
+                        site_name=site.name, site_url=site.url, status=status
+                    )
                     asyncio.create_task(trigger_system_alert(
-                        f"Site Offline: {site.name}",
-                        f"The site {site.name} ({site.url}) failed subsequent checks and is OFFLINE."
+                        alert_title,
+                        alert_body
                     ))
                 elif not is_down and streak['up'] >= 3 and site.id in confirmed_site_outages:
                     confirmed_site_outages.discard(site.id)
+                    site.alert_active = 0
+                    alert_title, alert_body = alert_template(
+                        alert_settings,
+                        "site_recovery_title", "site_recovery_body",
+                        "Site Recovered: {site_name}",
+                        "The site {site_name} ({site_url}) passed subsequent checks and is back ONLINE. Current status: {status}.",
+                        site_name=site.name, site_url=site.url, status=status
+                    )
                     asyncio.create_task(trigger_system_alert(
-                        f"Site Recovered: {site.name}",
-                        f"The site {site.name} ({site.url}) passed subsequent checks and is back ONLINE. Current status: {status}."
+                        alert_title,
+                        alert_body
                     ))
+                elif not is_down and streak['up'] >= 3:
+                    site.alert_active = 0
 
                 # Add site history entry
                 history_entry = models.History(
@@ -734,12 +840,16 @@ async def monitor_sites_task():
 
             # Update System History with server connectivity info
             gpu_metrics = await asyncio.to_thread(get_gpu_metrics)
+            net_io_snapshot = psutil.net_io_counters()
             sys_history = models.SystemHistory(
                 cpu=psutil.cpu_percent(),
                 ram=psutil.virtual_memory().percent,
                 disk=get_host_disk_usage('/').percent,
                 gpu=gpu_metrics['util'] if gpu_metrics else None,
-                network_online=1 if server_online else 0
+                network_online=1 if server_online else 0,
+                cpu_pressure=get_cpu_pressure(),
+                network_received=net_io_snapshot.bytes_recv,
+                network_sent=net_io_snapshot.bytes_sent
             )
             db.add(sys_history)
 
@@ -951,6 +1061,26 @@ def get_system_history(db: Session = Depends(get_db)):
     history = db.query(models.SystemHistory).order_by(models.SystemHistory.timestamp.asc()).all()
     return history
 
+@app.get("/api/logs")
+def get_logs(limit: int = 100):
+    entries = []
+    try:
+        with open("logs/app.log", "r") as log_file:
+            entries.extend(line.rstrip() for line in log_file.readlines()[-limit:])
+    except FileNotFoundError:
+        pass
+    return {"entries": entries}
+
+@app.delete("/api/logs/application")
+def clear_application_logs():
+    try:
+        with open("logs/app.log", "w"):
+            pass
+        return {"status": "cleared"}
+    except OSError as error:
+        logger.error(f"Error clearing application logs: {error}")
+        raise HTTPException(status_code=500, detail="Unable to clear application logs")
+
 LAST_NET_IO = {"rx": 0, "tx": 0, "time": 0.0}
 
 def get_host_partitions():
@@ -990,7 +1120,7 @@ def get_host_partitions():
     return partitions
 
 @app.get("/api/system-metrics")
-def get_system_metrics():
+def get_system_metrics(db: Session = Depends(get_db)):
     global LAST_NET_IO
     try:
         # Get system metrics - use interval=None for non-blocking readings
@@ -1013,6 +1143,22 @@ def get_system_metrics():
                 tx_rate = max(0.0, (net_io.bytes_sent - LAST_NET_IO["tx"]) / dt)
                 
         LAST_NET_IO = {"rx": net_io.bytes_recv, "tx": net_io.bytes_sent, "time": now}
+
+        yesterday = datetime.utcnow() - timedelta(hours=24)
+        history = db.query(models.SystemHistory).filter(
+            models.SystemHistory.timestamp >= yesterday,
+            models.SystemHistory.network_received.isnot(None),
+            models.SystemHistory.network_sent.isnot(None)
+        ).order_by(models.SystemHistory.timestamp.asc()).all()
+        received_24h = 0
+        sent_24h = 0
+        for previous, current in zip(history, history[1:]):
+            received_delta = current.network_received - previous.network_received
+            sent_delta = current.network_sent - previous.network_sent
+            if received_delta >= 0:
+                received_24h += received_delta
+            if sent_delta >= 0:
+                sent_24h += sent_delta
         
         # Get all disk partitions - match lsblk format
         disks = []
@@ -1079,6 +1225,7 @@ def get_system_metrics():
 
         return {
             "cpu": cpu_percent,
+            "cpu_pressure": get_cpu_pressure(),
             "cpu_name": cpu_name,
             "gpu_name": gpu_name,
             "memory": {
@@ -1108,16 +1255,24 @@ def get_system_metrics():
             "network_rates": {
                 "rx": round(rx_rate, 2), # Bytes/sec
                 "tx": round(tx_rate, 2)  # Bytes/sec
+            },
+            "network_totals": {
+                "rx": received_24h,
+                "tx": sent_24h,
+                "window_hours": 24
             }
         }
     except Exception as e:
         logger.error(f"Error fetching system metrics: {e}")
         return {
-            "cpu": 0, "memory": {"percent": 0, "used": 0, "total": 0},
+            "cpu": 0, "cpu_pressure": None,
+            "memory": {"percent": 0, "used": 0, "total": 0},
             "disk": {"percent": 0, "used": 0, "total": 0},
             "disks": [],
             "total_storage": {"total": 0, "used": 0, "free": 0, "percent": 0},
-            "gpu": None, "uptime": 0, "cpu_cores": [], "network_rates": {"rx": 0.0, "tx": 0.0}
+            "gpu": None, "uptime": 0, "cpu_cores": [],
+            "network_rates": {"rx": 0.0, "tx": 0.0},
+            "network_totals": {"rx": 0, "tx": 0, "window_hours": 24}
         }
 
 @app.get("/api/processes")
@@ -1276,7 +1431,12 @@ def update_settings(settings_data: SettingsSchema, db: Session = Depends(get_db)
             ntfy_enabled=settings_data.ntfy_enabled,
             ntfy_url=settings_data.ntfy_url,
             ntfy_topic=settings_data.ntfy_topic,
-            ntfy_token=settings_data.ntfy_token
+            ntfy_token=settings_data.ntfy_token,
+            **{field: getattr(settings_data, field) for field in (
+                "host_outage_title", "host_outage_body", "host_recovery_title", "host_recovery_body",
+                "site_outage_title", "site_outage_body", "site_recovery_title", "site_recovery_body",
+                "test_title", "test_body"
+            )}
         )
         db.add(settings)
     else:
@@ -1294,6 +1454,12 @@ def update_settings(settings_data: SettingsSchema, db: Session = Depends(get_db)
         settings.ntfy_url = settings_data.ntfy_url
         settings.ntfy_topic = settings_data.ntfy_topic
         settings.ntfy_token = settings_data.ntfy_token
+        for field in (
+            "host_outage_title", "host_outage_body", "host_recovery_title", "host_recovery_body",
+            "site_outage_title", "site_outage_body", "site_recovery_title", "site_recovery_body",
+            "test_title", "test_body"
+        ):
+            setattr(settings, field, getattr(settings_data, field))
     db.commit()
     return settings
 
@@ -1305,12 +1471,18 @@ async def test_notification(db: Session = Depends(get_db)):
     
     success = False
     details = []
+    test_title, test_body = alert_template(
+        settings,
+        "test_title", "test_body",
+        "Test Alert",
+        "This is a test alert notification from your Suros dashboard."
+    )
     
     if settings.email_enabled:
         email_ok, email_err = await send_email_alert(
             settings,
-            "Test Alert",
-            "This is a test alert notification from your Suros dashboard. Outage monitoring is functioning correctly!"
+            test_title,
+            test_body
         )
         if email_ok:
             success = True
@@ -1321,8 +1493,8 @@ async def test_notification(db: Session = Depends(get_db)):
     if settings.ntfy_enabled:
         ntfy_ok, ntfy_err = await send_ntfy_alert(
             settings,
-            "Test Alert",
-            "This is a test alert notification from your Suros dashboard."
+            test_title,
+            test_body
         )
         if ntfy_ok:
             success = True
