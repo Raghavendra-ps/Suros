@@ -74,6 +74,7 @@ class Settings(Base):
     site_recovery_body = Column(String, default="The site {site_name} ({site_url}) passed subsequent checks and is back ONLINE. Current status: {status}.")
     test_title = Column(String, default="Test Alert")
     test_body = Column(String, default="This is a test alert notification from your Suros dashboard.")
+    polling_rate = Column(Float, default=30.0)
 
 class DriveAlias(Base):
     __tablename__ = "drive_aliases"

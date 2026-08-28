@@ -139,7 +139,8 @@ const App = () => {
     ntfy_enabled: 0,
     ntfy_url: 'https://ntfy.sh',
     ntfy_topic: '',
-    ntfy_token: ''
+    ntfy_token: '',
+    polling_rate: 30
   });
   const [activeSettingsTab, setActiveSettingsTab] = useState('email');
   const [activeTemplateKey, setActiveTemplateKey] = useState('host_outage');
@@ -171,6 +172,7 @@ const App = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [customName, setCustomName] = useState('Odyssey');
   const [customLogo, setCustomLogo] = useState(null);
+  const pollingRate = Math.max(0.5, Number(settings.polling_rate) || 30);
 
   const fetchSites = async () => {
     try {
@@ -267,8 +269,8 @@ const App = () => {
     init();
 
     const procInterval = setInterval(() => { fetchProcesses(); }, 10000);
-    const interval = setInterval(() => { fetchSites(); fetchStats(); fetchSystemHistory(); fetchDrives(); }, 30000);
-    const metricsInterval = setInterval(() => { fetchSystemMetrics(); }, 5000);
+    const interval = setInterval(() => { fetchSites(); fetchStats(); fetchSystemHistory(); fetchDrives(); }, pollingRate * 1000);
+    const metricsInterval = setInterval(() => { fetchSystemMetrics(); }, pollingRate * 1000);
 
     return () => {
       clearInterval(interval);
@@ -276,7 +278,7 @@ const App = () => {
       clearInterval(procInterval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pollingRate]);
 
   useEffect(() => {
     if (!lastCheckTime) return;
@@ -649,6 +651,12 @@ const App = () => {
         <div className="drawer-split-layout">
           <div className="drawer-sidebar">
             <button
+              className={`sidebar-tab-btn ${activeSettingsTab === 'polling' ? 'active' : ''}`}
+              onClick={() => setActiveSettingsTab('polling')}
+            >
+              Polling Rate
+            </button>
+            <button
               className={`sidebar-tab-btn ${activeSettingsTab === 'email' ? 'active' : ''}`}
               onClick={() => setActiveSettingsTab('email')}
             >
@@ -675,6 +683,25 @@ const App = () => {
           </div>
 
           <div className="drawer-fields-container">
+            {activeSettingsTab === 'polling' && (
+              <div className="settings-section-fields">
+                <div className="form-group">
+                  <label>Polling interval (seconds)</label>
+                  <input
+                    type="number"
+                    min="0.5"
+                    step="0.5"
+                    value={draftSettings.polling_rate ?? 30}
+                    onChange={(e) => setDraftSettings({ ...draftSettings, polling_rate: Math.max(0.5, Number(e.target.value) || 0.5) })}
+                  />
+                </div>
+                <div className="settings-save-row">
+                  <button className="btn btn-accent" onClick={handleSaveDraft} disabled={saveStatus === 'saving'}>
+                    {saveStatus === 'saved' ? '✓ Saved' : 'Save Polling Rate'}
+                  </button>
+                </div>
+              </div>
+            )}
             {activeSettingsTab === 'email' && (
               <div className="settings-section-fields">
                 <div className="form-group checkbox-group" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
@@ -1034,7 +1061,7 @@ const App = () => {
           </div>
 
           {/* Card 10: Network Throughput */}
-          <div className="panel bento-card span-4" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div className="panel bento-card span-8" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div>
               <div className="stat-label" style={{ marginBottom: '6px' }}>Network Throughput</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontFamily: 'DM Mono', marginTop: '4px' }}>
@@ -1079,17 +1106,6 @@ const App = () => {
                   }
                 }}
               />
-            </div>
-          </div>
-
-          {/* Card 11: Server Connectivity */}
-          <div className="panel span-4">
-            <div className="panel-header">
-              <span className="panel-title">Server Connectivity</span>
-              <span className="last-check-label">internet history</span>
-            </div>
-            <div className="chart-wrap" style={{ height: '140px' }}>
-              <Line data={connectivityChartData} options={connectivityChartOptions} />
             </div>
           </div>
 

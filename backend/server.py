@@ -74,7 +74,8 @@ try:
             ("site_recovery_title", "VARCHAR DEFAULT 'Site Recovered: {site_name}'"),
             ("site_recovery_body", "VARCHAR DEFAULT 'The site {site_name} ({site_url}) passed subsequent checks and is back ONLINE. Current status: {status}.'"),
             ("test_title", "VARCHAR DEFAULT 'Test Alert'"),
-            ("test_body", "VARCHAR DEFAULT 'This is a test alert notification from your Suros dashboard.'")
+            ("test_body", "VARCHAR DEFAULT 'This is a test alert notification from your Suros dashboard.'"),
+            ("polling_rate", "FLOAT DEFAULT 30.0")
         ]
         
         for col_name, col_type in new_columns:
@@ -188,6 +189,7 @@ class SettingsSchema(BaseModel):
     site_recovery_body: Optional[str] = "The site {site_name} ({site_url}) passed subsequent checks and is back ONLINE. Current status: {status}."
     test_title: Optional[str] = "Test Alert"
     test_body: Optional[str] = "This is a test alert notification from your Suros dashboard."
+    polling_rate: Optional[float] = 30.0
 
     class Config:
         from_attributes = True
@@ -708,9 +710,11 @@ async def monitor_sites_task():
             last_net_time = now
 
         db = SessionLocal()
+        polling_rate = 30.0
         try:
             global last_network_online, current_outage_type, current_outage_start
             alert_settings = db.query(models.Settings).first()
+            polling_rate = max(0.5, float(alert_settings.polling_rate or 30.0)) if alert_settings else 30.0
 
             # Check server internet connectivity
             server_online = await asyncio.to_thread(is_internet_reachable)
@@ -866,7 +870,7 @@ async def monitor_sites_task():
             db.close()
 
         # Check every 30 seconds for live updates
-        await asyncio.sleep(30)
+        await asyncio.sleep(polling_rate)
 
 async def daily_export_task():
     import json
@@ -1004,8 +1008,12 @@ def get_stats(db: Session = Depends(get_db)):
                 total_outages += 1
             last_inner_status = h.status
 
-    # Network and Power Outages determined from hourly status logs
-    network_outages, power_outages = calculate_outages_from_logs()
+    # Network outages are persisted as events, so the count survives restarts.
+    network_outages = db.query(models.OutageEvent).filter(
+        models.OutageEvent.outage_type == 'network',
+        models.OutageEvent.started_at >= yesterday
+    ).count()
+    _, power_outages = calculate_outages_from_logs()
 
     # Current ongoing outage
     current_outage = None
@@ -1407,7 +1415,8 @@ def get_settings(db: Session = Depends(get_db)):
             ntfy_enabled=0,
             ntfy_url="https://ntfy.sh",
             ntfy_topic=None,
-            ntfy_token=None
+            ntfy_token=None,
+            polling_rate=30.0
         )
         db.add(settings)
         db.commit()
@@ -1436,7 +1445,8 @@ def update_settings(settings_data: SettingsSchema, db: Session = Depends(get_db)
                 "host_outage_title", "host_outage_body", "host_recovery_title", "host_recovery_body",
                 "site_outage_title", "site_outage_body", "site_recovery_title", "site_recovery_body",
                 "test_title", "test_body"
-            )}
+            )},
+            polling_rate=max(0.5, float(settings_data.polling_rate or 30.0))
         )
         db.add(settings)
     else:
@@ -1460,6 +1470,7 @@ def update_settings(settings_data: SettingsSchema, db: Session = Depends(get_db)
             "test_title", "test_body"
         ):
             setattr(settings, field, getattr(settings_data, field))
+        settings.polling_rate = max(0.5, float(settings_data.polling_rate or 30.0))
     db.commit()
     return settings
 
@@ -1664,7 +1675,12 @@ CACHED_DRIVES = []
 async def monitor_drives_task():
     global CACHED_DRIVES
     while True:
+        polling_rate = 300.0
         try:
+            settings_db = SessionLocal()
+            settings = settings_db.query(models.Settings).first()
+            polling_rate = max(0.5, float(settings.polling_rate or 30.0)) if settings else 300.0
+            settings_db.close()
             res = await asyncio.to_thread(subprocess.run, ["smartctl", "--scan"], capture_output=True, text=True, timeout=2)
             scanned_devices = []
             if res.returncode == 0 and res.stdout:
@@ -1707,7 +1723,7 @@ async def monitor_drives_task():
         except Exception as e:
             logger.error(f"Error in monitor_drives_task: {e}")
         
-        await asyncio.sleep(300) # Check every 5 minutes
+        await asyncio.sleep(polling_rate)
 
 @app.get("/api/drives")
 async def get_drives_endpoint(db: Session = Depends(get_db)):
