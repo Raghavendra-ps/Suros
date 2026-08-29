@@ -479,13 +479,25 @@ const App = () => {
     ? safeSites[0].history.map(h => h ? new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' }) : '')
     : [];
 
+  const historyLength = (safeSites.length > 0 && Array.isArray(safeSites[0]?.history)) ? safeSites[0].history.length : 0;
+  const aggregatedLatency = [];
+  for (let i = 0; i < historyLength; i++) {
+    let sum = 0;
+    let count = 0;
+    for (const s of safeSites) {
+      if (Array.isArray(s.history) && s.history[i] && typeof s.history[i].latency === 'number') {
+        sum += s.history[i].latency;
+        count++;
+      }
+    }
+    aggregatedLatency.push(count > 0 ? Math.round(sum / count) : (stats.network_latency || 0));
+  }
+
   const latencyChartData = {
     labels: chartLabels,
     datasets: [{
       label: 'Avg Latency (ms)',
-      data: (safeSites.length > 0 && Array.isArray(safeSites[0]?.history))
-        ? safeSites[0].history.map(h => h ? h.latency : 0)
-        : [],
+      data: aggregatedLatency,
       borderColor: '#c84b2f',
       backgroundColor: 'rgba(200,75,47,0.07)',
       borderWidth: 2,

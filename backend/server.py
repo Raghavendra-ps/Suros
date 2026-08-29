@@ -202,162 +202,92 @@ class SettingsSchema(BaseModel):
     class Config:
         from_attributes = True
 
-def build_html_email(subject, message):
+def build_html_email(subject, message, logo_src=""):
     import base64
-    # Determine color theme based on event severity
     is_restored = "restored" in subject.lower() or "recovered" in subject.lower() or "success" in subject.lower()
     accent_color = "#2fa87e" if is_restored else "#c84b2f"
     status_label = "RECOVERY" if is_restored else "ALERT"
 
-    # Convert logo to embedded base64 data URI
-    logo_src = ""
-    for logo_path in [
-        os.path.join(STATIC_DIR, "suros-logo-light.png"),
-        "/root/Suros/frontend/public/suros-logo-light.png",
-        "static/suros-logo-light.png"
-    ]:
-        if os.path.exists(logo_path):
-            try:
-                with open(logo_path, "rb") as f:
-                    b64_data = base64.b64encode(f.read()).decode("utf-8")
-                    logo_src = f"data:image/png;base64,{b64_data}"
-                break
-            except Exception:
-                pass
+    if not logo_src:
+        for logo_path in [
+            os.path.join(STATIC_DIR, "suros-logo-light.png"),
+            "/root/Suros/frontend/public/suros-logo-light.png",
+            "/app/static/suros-logo-light.png",
+            "/app/suros-logo-light.png",
+            "static/suros-logo-light.png"
+        ]:
+            if os.path.exists(logo_path):
+                try:
+                    with open(logo_path, "rb") as f:
+                        b64_data = base64.b64encode(f.read()).decode("utf-8")
+                        logo_src = f"data:image/png;base64,{b64_data}"
+                    break
+                except Exception:
+                    pass
 
-    logo_img_tag = f'<img src="{logo_src}" style="height: 28px; width: auto; vertical-align: middle; margin-right: 12px;" alt="Suros Logo" />' if logo_src else ""
+    logo_img_tag = f'<img src="{logo_src}" height="32" style="height: 32px; max-height: 32px; width: auto; vertical-align: middle; margin-right: 12px; display: inline-block;" alt="Suros" />' if logo_src else ""
 
-    html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <title>{subject}</title>
-      <style>
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@800&family=DM+Mono:wght@400;500;700&display=swap');
-        body {{
-          background-color: #0f0e0d;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-          margin: 0;
-          padding: 40px 20px;
-          color: #f2ede4;
-        }}
-        .container {{
-          max-width: 600px;
-          margin: 0 auto;
-          background-color: #1a1816;
-          border: 1px solid #332e28;
-          border-left: 5px solid {accent_color};
-          border-radius: 4px;
-          padding: 32px;
-          box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-        }}
-        .header {{
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          border-bottom: 1px solid #332e28;
-          padding-bottom: 16px;
-          margin-bottom: 24px;
-        }}
-        .logo-wrap {{
-          display: flex;
-          align-items: center;
-        }}
-        .suros-title {{
-          font-family: 'Syne', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-          font-weight: 800;
-          font-size: 1.6rem;
-          letter-spacing: -0.04em;
-          text-transform: uppercase;
-          display: inline-block;
-          line-height: 1;
-          color: #000000;
-          -webkit-text-stroke: 1px #000000;
-          vertical-align: middle;
-        }}
-        .badge {{
-          font-family: "DM Mono", "SF Mono", monospace;
-          font-size: 10px;
-          font-weight: bold;
-          text-transform: uppercase;
-          letter-spacing: 0.1em;
-          background-color: {accent_color}22;
-          color: {accent_color};
-          padding: 4px 10px;
-          border-radius: 2px;
-          border: 1px solid {accent_color}44;
-        }}
-        .title {{
-          font-size: 20px;
-          font-weight: 800;
-          color: #f2ede4;
-          margin: 0 0 16px 0;
-        }}
-        .message {{
-          font-size: 14px;
-          line-height: 1.6;
-          color: #8a8278;
-          margin-bottom: 24px;
-        }}
-        .meta-box {{
-          background-color: #221f1c;
-          border: 1px solid #332e28;
-          border-radius: 2px;
-          padding: 16px;
-          font-family: "DM Mono", "SF Mono", monospace;
-          font-size: 12px;
-          color: #8a8278;
-        }}
-        .meta-row {{
-          display: flex;
-          justify-content: space-between;
-          padding: 4px 0;
-        }}
-        .meta-label {{
-          color: #55504a;
-        }}
-        .footer {{
-          margin-top: 32px;
-          text-align: center;
-          font-size: 11px;
-          color: #55504a;
-          border-top: 1px solid #332e28;
-          padding-top: 16px;
-          font-family: "DM Mono", monospace;
-        }}
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <div class="logo-wrap">
-            {logo_img_tag}
-            <span class="suros-title">SUROS</span>
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{subject}</title>
+</head>
+<body style="background-color: #0f0e0d; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 40px 20px; color: #f2ede4;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0f0e0d;">
+    <tr>
+      <td align="center">
+        <div style="max-width: 600px; width: 100%; margin: 0 auto; background-color: #1a1816; border: 1px solid #332e28; border-left: 5px solid {accent_color}; border-radius: 4px; padding: 32px; box-sizing: border-box; text-align: left;">
+          
+          <!-- Header Row -->
+          <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-bottom: 1px solid #332e28; padding-bottom: 16px; margin-bottom: 24px;">
+            <tr>
+              <td align="left" style="vertical-align: middle;">
+                <table border="0" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td style="vertical-align: middle;">
+                      {logo_img_tag}
+                    </td>
+                    <td style="vertical-align: middle;">
+                      <span style="font-family: 'Syne', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-weight: 900; font-size: 26px; letter-spacing: -0.04em; text-transform: uppercase; color: #000000 !important; -webkit-text-stroke: 1.5px #000000; display: inline-block; line-height: 1;">SUROS</span>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+              <td align="right" style="vertical-align: middle;">
+                <span style="font-family: 'DM Mono', 'SF Mono', Menlo, monospace; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em; background-color: {accent_color}22; color: {accent_color}; padding: 5px 12px; border-radius: 3px; border: 1px solid {accent_color}44; display: inline-block;">{status_label}</span>
+              </td>
+            </tr>
+          </table>
+
+          <h2 style="font-size: 20px; font-weight: 800; color: #f2ede4; margin: 0 0 16px 0;">{subject}</h2>
+          
+          <div style="font-size: 14px; line-height: 1.6; color: #8a8278; margin-bottom: 24px; white-space: pre-wrap;">{message}</div>
+          
+          <!-- Metadata Box -->
+          <div style="background-color: #221f1c; border: 1px solid #332e28; border-radius: 4px; padding: 16px; font-family: 'DM Mono', 'SF Mono', Menlo, monospace; font-size: 12px; color: #8a8278;">
+            <table width="100%" border="0" cellspacing="0" cellpadding="0">
+              <tr>
+                <td style="color: #55504a; padding: 4px 0;">Time</td>
+                <td align="right" style="color: #8a8278; padding: 4px 0;">{datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}</td>
+              </tr>
+              <tr>
+                <td style="color: #55504a; padding: 4px 0;">Source</td>
+                <td align="right" style="color: #8a8278; padding: 4px 0;">Suros</td>
+              </tr>
+            </table>
           </div>
-          <span class="badge">{status_label}</span>
-        </div>
-        <h2 class="title">{subject}</h2>
-        <div class="message">
-          {message}
-        </div>
-        <div class="meta-box">
-          <div class="meta-row">
-            <span class="meta-label">Time</span>
-            <span>{datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}</span>
+
+          <div style="margin-top: 32px; text-align: center; font-size: 11px; color: #55504a; border-top: 1px solid #332e28; padding-top: 16px; font-family: 'DM Mono', monospace;">
+            SUROS | Automated Alert System
           </div>
-          <div class="meta-row">
-            <span class="meta-label">Source</span>
-            <span>Suros</span>
-          </div>
+
         </div>
-        <div class="footer">
-          SUROS | Automated Alert System
-        </div>
-      </div>
-    </body>
-    </html>
-    """
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
     return html
 
 async def send_email_resend(api_key, recipient, subject, body):
@@ -386,17 +316,53 @@ async def send_email_resend(api_key, recipient, subject, body):
 
 def _send_smtp_sync(smtp_server, smtp_port, username, password, recipient, subject, body):
     from email.mime.multipart import MIMEMultipart
-    
-    msg = MIMEMultipart('alternative')
-    msg['Subject'] = Header(subject, 'utf-8')
-    msg['From'] = username
-    msg['To'] = recipient
-    
-    # Attach both plain text and HTML versions
-    part1 = MIMEText(body, 'plain', 'utf-8')
-    part2 = MIMEText(build_html_email(subject, body), 'html', 'utf-8')
-    msg.attach(part1)
-    msg.attach(part2)
+    from email.mime.image import MIMEImage
+
+    # Try attaching logo as CID for email clients that block base64 data URIs
+    logo_data = None
+    for logo_path in [
+        os.path.join(STATIC_DIR, "suros-logo-light.png"),
+        "/root/Suros/frontend/public/suros-logo-light.png",
+        "/app/static/suros-logo-light.png",
+        "/app/suros-logo-light.png",
+        "static/suros-logo-light.png"
+    ]:
+        if os.path.exists(logo_path):
+            try:
+                with open(logo_path, "rb") as f:
+                    logo_data = f.read()
+                break
+            except Exception:
+                pass
+
+    if logo_data:
+        msg = MIMEMultipart('related')
+        msg['Subject'] = Header(subject, 'utf-8')
+        msg['From'] = username
+        msg['To'] = recipient
+
+        msg_alt = MIMEMultipart('alternative')
+        msg.attach(msg_alt)
+
+        part1 = MIMEText(body, 'plain', 'utf-8')
+        html_content = build_html_email(subject, body, logo_src="cid:suros_logo")
+        part2 = MIMEText(html_content, 'html', 'utf-8')
+        msg_alt.attach(part1)
+        msg_alt.attach(part2)
+
+        img_part = MIMEImage(logo_data, 'png')
+        img_part.add_header('Content-ID', '<suros_logo>')
+        img_part.add_header('Content-Disposition', 'inline', filename='suros-logo.png')
+        msg.attach(img_part)
+    else:
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = Header(subject, 'utf-8')
+        msg['From'] = username
+        msg['To'] = recipient
+        part1 = MIMEText(body, 'plain', 'utf-8')
+        part2 = MIMEText(build_html_email(subject, body), 'html', 'utf-8')
+        msg.attach(part1)
+        msg.attach(part2)
     
     server = None
     try:
