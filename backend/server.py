@@ -223,10 +223,29 @@ async def send_email_resend(api_key: str, recipient: str, subject: str, body: st
         return False, str(e)
 
 def build_html_email(subject, message):
+    import base64
     # Determine color theme based on event severity
     is_restored = "restored" in subject.lower() or "recovered" in subject.lower() or "success" in subject.lower()
     accent_color = "#2fa87e" if is_restored else "#c84b2f"
     status_label = "RECOVERY" if is_restored else "ALERT"
+
+    # Convert logo to embedded base64 data URI
+    logo_src = ""
+    for logo_path in [
+        os.path.join(STATIC_DIR, "suros-logo-dark.png"),
+        "/root/Suros/frontend/public/suros-logo-dark.png",
+        "static/suros-logo-dark.png"
+    ]:
+        if os.path.exists(logo_path):
+            try:
+                with open(logo_path, "rb") as f:
+                    b64_data = base64.b64encode(f.read()).decode("utf-8")
+                    logo_src = f"data:image/png;base64,{b64_data}"
+                break
+            except Exception:
+                pass
+
+    logo_img_tag = f'<img src="{logo_src}" style="height: 28px; width: auto; vertical-align: middle; margin-right: 12px;" alt="Suros Logo" />' if logo_src else ""
 
     html = f"""
     <!DOCTYPE html>
@@ -235,6 +254,7 @@ def build_html_email(subject, message):
       <meta charset="utf-8">
       <title>{subject}</title>
       <style>
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@800&family=DM+Mono:wght@400;500;700&display=swap');
         body {{
           background-color: #0f0e0d;
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -260,8 +280,24 @@ def build_html_email(subject, message):
           padding-bottom: 16px;
           margin-bottom: 24px;
         }}
+        .logo-wrap {{
+          display: flex;
+          align-items: center;
+        }}
+        .suros-title {{
+          font-family: 'Syne', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          font-weight: 800;
+          font-size: 1.6rem;
+          letter-spacing: -0.04em;
+          text-transform: uppercase;
+          display: inline-block;
+          line-height: 1;
+          color: #ff3333;
+          -webkit-text-stroke: 1px #ff3333;
+          vertical-align: middle;
+        }}
         .badge {{
-          font-family: "SF Mono", "DM Mono", monospace;
+          font-family: "DM Mono", "SF Mono", monospace;
           font-size: 10px;
           font-weight: bold;
           text-transform: uppercase;
@@ -289,7 +325,7 @@ def build_html_email(subject, message):
           border: 1px solid #332e28;
           border-radius: 2px;
           padding: 16px;
-          font-family: "SF Mono", "DM Mono", monospace;
+          font-family: "DM Mono", "SF Mono", monospace;
           font-size: 12px;
           color: #8a8278;
         }}
@@ -308,13 +344,17 @@ def build_html_email(subject, message):
           color: #55504a;
           border-top: 1px solid #332e28;
           padding-top: 16px;
+          font-family: "DM Mono", monospace;
         }}
       </style>
     </head>
     <body>
       <div class="container">
         <div class="header">
-          <span style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-weight: 800; font-size: 14px; color: #f2ede4;">Suros</span>
+          <div class="logo-wrap">
+            {logo_img_tag}
+            <span class="suros-title">SUROS</span>
+          </div>
           <span class="badge">{status_label}</span>
         </div>
         <h2 class="title">{subject}</h2>
@@ -331,8 +371,8 @@ def build_html_email(subject, message):
             <span>Suros</span>
           </div>
         </div>
-                <div class="footer">
-                    Suros | Automated Alert System
+        <div class="footer">
+          SUROS | Automated Alert System
         </div>
       </div>
     </body>
@@ -1540,7 +1580,7 @@ def check_drive_smart_status(device: str):
     try:
         # Run smartctl -a --json <device>
         cmd = ["smartctl", "-a", "--json", device]
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
         if not res.stdout:
             return None
         data = json.loads(res.stdout)
@@ -1822,38 +1862,9 @@ async def get_drives_endpoint(db: Session = Depends(get_db)):
     aliases = {da.device: da.alias for da in db.query(models.DriveAlias).all()}
     res_drives = []
     
-    # If cache is not populated yet, do a quick run
+    # If cache is not populated yet, scan immediately
     if not CACHED_DRIVES:
-        res = await asyncio.to_thread(subprocess.run, ["smartctl", "--scan"], capture_output=True, text=True, timeout=2)
-        scanned_devices = []
-        if res.returncode == 0 and res.stdout:
-            lines = res.stdout.strip().split("\n")
-            for line in lines:
-                if line.strip():
-                    parts = line.split()
-                    if parts:
-                        scanned_devices.append(parts[0])
-        
-        new_drives = []
-        if scanned_devices:
-            tasks = [asyncio.to_thread(check_drive_smart_status, dev) for dev in scanned_devices]
-            results = await asyncio.gather(*tasks)
-            for dev, result in zip(scanned_devices, results):
-                if result is not None:
-                    new_drives.append(result)
-        
-        if not new_drives:
-            now = datetime.now()
-            date_str = now.strftime("%B %d, %Y")
-            new_drives = [
-                {"device": "/DEV/SDA", "model": "SAMSUNG_SSD_860_EVO_500GB", "status": "Passed", "temperature": 37, "capacity": "465.8 GB", "powered_on": "1.6 years", "last_updated": date_str},
-                {"device": "/DEV/SDB", "model": "WDC_WD140EDFZ-11A0VA0", "status": "Passed", "temperature": 33, "capacity": "12.73 TB", "powered_on": "131.3 days", "last_updated": date_str},
-                {"device": "/DEV/SDC", "model": "WDC_WD140EDFZ-11A0VA0", "status": "Passed", "temperature": 31, "capacity": "12.73 TB", "powered_on": "131.3 days", "last_updated": date_str},
-                {"device": "/DEV/SDD", "model": "WDC_WD80EFAX-68LHPN0", "status": "Passed", "temperature": 30, "capacity": "7.28 TB", "powered_on": "2.9 years", "last_updated": date_str},
-                {"device": "/DEV/SDE", "model": "WDC_WD140EDFZ-11A0VA0", "status": "Passed", "temperature": 29, "capacity": "12.73 TB", "powered_on": "131.3 days", "last_updated": date_str},
-                {"device": "/DEV/SDF", "model": "WDC_WD60EFRX-68MYMN1", "status": "Passed", "temperature": 30, "capacity": "5.46 TB", "powered_on": "5.4 years", "last_updated": date_str}
-            ]
-        CACHED_DRIVES = new_drives
+        await scan_and_update_drives()
 
     for d in CACHED_DRIVES:
         drive_copy = dict(d)
