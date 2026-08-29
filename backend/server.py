@@ -232,9 +232,9 @@ def build_html_email(subject, message):
     # Convert logo to embedded base64 data URI
     logo_src = ""
     for logo_path in [
-        os.path.join(STATIC_DIR, "suros-logo-dark.png"),
-        "/root/Suros/frontend/public/suros-logo-dark.png",
-        "static/suros-logo-dark.png"
+        os.path.join(STATIC_DIR, "suros-logo-light.png"),
+        "/root/Suros/frontend/public/suros-logo-light.png",
+        "static/suros-logo-light.png"
     ]:
         if os.path.exists(logo_path):
             try:
@@ -292,8 +292,8 @@ def build_html_email(subject, message):
           text-transform: uppercase;
           display: inline-block;
           line-height: 1;
-          color: #ff3333;
-          -webkit-text-stroke: 1px #ff3333;
+          color: #000000;
+          -webkit-text-stroke: 1px #000000;
           vertical-align: middle;
         }}
         .badge {{
