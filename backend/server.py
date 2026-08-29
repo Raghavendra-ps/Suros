@@ -202,26 +202,6 @@ class SettingsSchema(BaseModel):
     class Config:
         from_attributes = True
 
-async def send_email_resend(api_key: str, recipient: str, subject: str, body: str):
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    data = {
-        "from": "onboarding@resend.dev",
-        "to": [recipient],
-        "subject": subject,
-        "html": f"<p>{body}</p>"
-    }
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post("https://api.resend.com/emails", json=data, headers=headers, timeout=5.0)
-            if resp.status_code >= 200 and resp.status_code < 300:
-                return True, None
-            return False, resp.text
-    except Exception as e:
-        return False, str(e)
-
 def build_html_email(subject, message):
     import base64
     # Determine color theme based on event severity
