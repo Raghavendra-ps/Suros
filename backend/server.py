@@ -1570,25 +1570,45 @@ def check_drive_smart_status(device: str):
         passed = data.get("smart_status", {}).get("passed", True)
         status = "Passed" if passed else "Failed"
         
-        # Model
-        model = data.get("model_name", "Unknown Drive")
+        # Model - try model_name, device.model_name, or scsi_model_name
+        model = data.get("model_name") or data.get("device", {}).get("model_name") or data.get("scsi_model_name") or data.get("vendor", "") + " " + data.get("product", "")
+        model = model.strip() or "Hard Drive"
         
         now = datetime.now()
-        last_updated = now.strftime("August %d, %Y")
+        last_updated = now.strftime("%B %d, %Y")
         
         # Derive disk usage percent by matching device to mounted partitions
         used_pct = None
         try:
-            dev_base = device.lower().split("/")[-1]  # e.g. "sda"
-            for part in psutil.disk_partitions(all=True):
-                part_dev = part.device.lower().split("/")[-1]
-                if part_dev.startswith(dev_base):
+            dev_base = device.lower().split("/")[-1]  # e.g. "sda" or "sdg"
+            # First check /mnt/host/proc/mounts
+            for mounts_file in ["/mnt/host/proc/mounts", "/mnt/host/etc/mtab"]:
+                if os.path.exists(mounts_file):
                     try:
-                        usage = get_host_disk_usage(part.mountpoint)
-                        used_pct = round(usage.percent, 1)
+                        with open(mounts_file, "r") as f:
+                            for line in f:
+                                parts = line.split()
+                                if len(parts) >= 2 and parts[0].startswith("/dev/"):
+                                    part_name = parts[0].lower().split("/")[-1]
+                                    if part_name.startswith(dev_base):
+                                        usage = get_host_disk_usage(parts[1])
+                                        used_pct = round(usage.percent, 1)
+                                        break
                     except Exception:
                         pass
+                if used_pct is not None:
                     break
+
+            if used_pct is None:
+                for part in psutil.disk_partitions(all=True):
+                    part_dev = part.device.lower().split("/")[-1]
+                    if part_dev.startswith(dev_base):
+                        try:
+                            usage = get_host_disk_usage(part.mountpoint)
+                            used_pct = round(usage.percent, 1)
+                        except Exception:
+                            pass
+                        break
         except Exception:
             pass
 

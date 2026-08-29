@@ -13,6 +13,7 @@ services:
       - suros-data:/app/data
       - suros-logs:/app/logs
       - suros-static:/app/static
+      - /dev:/dev
       - /:/mnt/host:ro
     restart: always
     privileged: true
