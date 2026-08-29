@@ -143,7 +143,8 @@ const App = () => {
     ntfy_token: '',
     polling_rate: 30,
     smart_schedule: 'daily',
-    smart_time: '03:00'
+    smart_time: '03:00',
+    timezone: 'Asia/Kolkata'
   });
   const [activeSettingsTab, setActiveSettingsTab] = useState('email');
   const [activeTemplateKey, setActiveTemplateKey] = useState('host_outage');
@@ -682,10 +683,9 @@ const App = () => {
             transform: 'scaleX(1.3) scaleY(0.95)',
             transformOrigin: 'left center',
             lineHeight: 1,
-            color: theme === 'dark' ? '#ff3333' : '#000000',
+            color: 'var(--text)',
             marginLeft: '14px',
             verticalAlign: 'middle',
-            WebkitTextStroke: theme === 'dark' ? '1px #ff3333' : '1px #000000'
           }}>SUROS</span>
         </div>
         <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -781,6 +781,30 @@ const App = () => {
                   />
                   <span style={{ fontSize: '0.62rem', color: 'var(--text3)', marginTop: '4px', fontFamily: 'DM Mono' }}>
                     Drives will run health diagnostics automatically at this time rather than continuous polling.
+                  </span>
+                </div>
+
+                <div className="form-group" style={{ marginTop: '1.2rem', paddingTop: '1.2rem', borderTop: '1px solid var(--border)' }}>
+                  <label>Alert & Email Timezone</label>
+                  <select
+                    value={draftSettings.timezone || 'Asia/Kolkata'}
+                    onChange={(e) => setDraftSettings({ ...draftSettings, timezone: e.target.value })}
+                  >
+                    <option value="Asia/Kolkata">Asia/Kolkata (IST, UTC+5:30)</option>
+                    <option value="UTC">UTC (Coordinated Universal Time)</option>
+                    <option value="America/New_York">America/New_York (EST/EDT)</option>
+                    <option value="America/Chicago">America/Chicago (CST/CDT)</option>
+                    <option value="America/Denver">America/Denver (MST/MDT)</option>
+                    <option value="America/Los_Angeles">America/Los_Angeles (PST/PDT)</option>
+                    <option value="Europe/London">Europe/London (GMT/BST)</option>
+                    <option value="Europe/Paris">Europe/Paris (CET/CEST)</option>
+                    <option value="Asia/Dubai">Asia/Dubai (GST, UTC+4)</option>
+                    <option value="Asia/Singapore">Asia/Singapore (SGT, UTC+8)</option>
+                    <option value="Asia/Tokyo">Asia/Tokyo (JST, UTC+9)</option>
+                    <option value="Australia/Sydney">Australia/Sydney (AEST/AEDT)</option>
+                  </select>
+                  <span style={{ fontSize: '0.62rem', color: 'var(--text3)', marginTop: '4px', fontFamily: 'DM Mono' }}>
+                    Dictates timestamps shown across automated email notification templates.
                   </span>
                 </div>
 

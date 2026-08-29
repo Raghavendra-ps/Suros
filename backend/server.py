@@ -81,7 +81,8 @@ try:
             ("test_body", "VARCHAR DEFAULT 'This is a test alert notification from your Suros dashboard.'"),
             ("polling_rate", "FLOAT DEFAULT 30.0"),
             ("smart_schedule", "VARCHAR DEFAULT 'daily'"),
-            ("smart_time", "VARCHAR DEFAULT '03:00'")
+            ("smart_time", "VARCHAR DEFAULT '03:00'"),
+            ("timezone", "VARCHAR DEFAULT 'Asia/Kolkata'")
         ]
         
         for col_name, col_type in new_columns:
@@ -198,23 +199,33 @@ class SettingsSchema(BaseModel):
     polling_rate: Optional[float] = 30.0
     smart_schedule: Optional[str] = "daily"
     smart_time: Optional[str] = "03:00"
+    timezone: Optional[str] = "Asia/Kolkata"
 
     class Config:
         from_attributes = True
 
-def build_html_email(subject, message, logo_src=""):
+def get_localized_timestamp(tz_name="Asia/Kolkata"):
+    try:
+        import zoneinfo
+        tz = zoneinfo.ZoneInfo(tz_name or "Asia/Kolkata")
+        now = datetime.now(tz)
+        return now.strftime('%Y-%m-%d %H:%M:%S %Z')
+    except Exception:
+        return datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
+
+def build_html_email(subject, message, logo_src="", timezone_name="Asia/Kolkata"):
     import base64
     is_restored = "restored" in subject.lower() or "recovered" in subject.lower() or "success" in subject.lower()
     accent_color = "#2fa87e" if is_restored else "#c84b2f"
     status_label = "RECOVERY" if is_restored else "ALERT"
+    formatted_time = get_localized_timestamp(timezone_name)
 
     if not logo_src:
         for logo_path in [
-            os.path.join(STATIC_DIR, "suros-logo-light.png"),
-            "/root/Suros/frontend/public/suros-logo-light.png",
-            "/app/static/suros-logo-light.png",
-            "/app/suros-logo-light.png",
-            "static/suros-logo-light.png"
+            os.path.join(STATIC_DIR, "suros-header-combo-light.png"),
+            "/root/Suros/backend/static/suros-header-combo-light.png",
+            "/app/static/suros-header-combo-light.png",
+            "static/suros-header-combo-light.png"
         ]:
             if os.path.exists(logo_path):
                 try:
@@ -225,7 +236,7 @@ def build_html_email(subject, message, logo_src=""):
                 except Exception:
                     pass
 
-    logo_img_tag = f'<img src="{logo_src}" height="32" style="height: 32px; max-height: 32px; width: auto; vertical-align: middle; margin-right: 12px; display: inline-block;" alt="Suros" />' if logo_src else ""
+    logo_img_tag = f'<img src="{logo_src}" height="32" style="height: 32px; max-height: 32px; width: auto; vertical-align: middle; display: inline-block;" alt="SUROS" />' if logo_src else '<span style="font-family: \'Syne\', sans-serif; font-weight: 800; font-size: 26px; letter-spacing: -0.04em; color: #000000; text-transform: uppercase;">SUROS</span>'
 
     html = f"""<!DOCTYPE html>
 <html>
@@ -243,16 +254,7 @@ def build_html_email(subject, message, logo_src=""):
           <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-bottom: 1px solid #332e28; padding-bottom: 16px; margin-bottom: 24px;">
             <tr>
               <td align="left" style="vertical-align: middle;">
-                <table border="0" cellspacing="0" cellpadding="0">
-                  <tr>
-                    <td style="vertical-align: middle;">
-                      {logo_img_tag}
-                    </td>
-                    <td style="vertical-align: middle;">
-                      <span style="font-family: 'Syne', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-weight: 900; font-size: 26px; letter-spacing: -0.04em; text-transform: uppercase; color: #000000 !important; -webkit-text-stroke: 1.5px #000000; display: inline-block; line-height: 1;">SUROS</span>
-                    </td>
-                  </tr>
-                </table>
+                {logo_img_tag}
               </td>
               <td align="right" style="vertical-align: middle;">
                 <span style="font-family: 'DM Mono', 'SF Mono', Menlo, monospace; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em; background-color: {accent_color}22; color: {accent_color}; padding: 5px 12px; border-radius: 3px; border: 1px solid {accent_color}44; display: inline-block;">{status_label}</span>
@@ -269,11 +271,7 @@ def build_html_email(subject, message, logo_src=""):
             <table width="100%" border="0" cellspacing="0" cellpadding="0">
               <tr>
                 <td style="color: #55504a; padding: 4px 0;">Time</td>
-                <td align="right" style="color: #8a8278; padding: 4px 0;">{datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}</td>
-              </tr>
-              <tr>
-                <td style="color: #55504a; padding: 4px 0;">Source</td>
-                <td align="right" style="color: #8a8278; padding: 4px 0;">Suros</td>
+                <td align="right" style="color: #8a8278; padding: 4px 0;">{formatted_time}</td>
               </tr>
             </table>
           </div>
@@ -290,13 +288,13 @@ def build_html_email(subject, message, logo_src=""):
 </html>"""
     return html
 
-async def send_email_resend(api_key, recipient, subject, body):
+async def send_email_resend(api_key, recipient, subject, body, timezone_name="Asia/Kolkata"):
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
     
-    html_content = build_html_email(subject, body)
+    html_content = build_html_email(subject, body, timezone_name=timezone_name)
     
     data = {
         "from": "Suros Alerts <alerts@resend.dev>",
@@ -314,18 +312,16 @@ async def send_email_resend(api_key, recipient, subject, body):
     except Exception as e:
         return False, str(e)
 
-def _send_smtp_sync(smtp_server, smtp_port, username, password, recipient, subject, body):
+def _send_smtp_sync(smtp_server, smtp_port, username, password, recipient, subject, body, timezone_name="Asia/Kolkata"):
     from email.mime.multipart import MIMEMultipart
     from email.mime.image import MIMEImage
 
-    # Try attaching logo as CID for email clients that block base64 data URIs
     logo_data = None
     for logo_path in [
-        os.path.join(STATIC_DIR, "suros-logo-light.png"),
-        "/root/Suros/frontend/public/suros-logo-light.png",
-        "/app/static/suros-logo-light.png",
-        "/app/suros-logo-light.png",
-        "static/suros-logo-light.png"
+        os.path.join(STATIC_DIR, "suros-header-combo-light.png"),
+        "/root/Suros/backend/static/suros-header-combo-light.png",
+        "/app/static/suros-header-combo-light.png",
+        "static/suros-header-combo-light.png"
     ]:
         if os.path.exists(logo_path):
             try:
@@ -345,14 +341,14 @@ def _send_smtp_sync(smtp_server, smtp_port, username, password, recipient, subje
         msg.attach(msg_alt)
 
         part1 = MIMEText(body, 'plain', 'utf-8')
-        html_content = build_html_email(subject, body, logo_src="cid:suros_logo")
+        html_content = build_html_email(subject, body, logo_src="cid:suros_header", timezone_name=timezone_name)
         part2 = MIMEText(html_content, 'html', 'utf-8')
         msg_alt.attach(part1)
         msg_alt.attach(part2)
 
         img_part = MIMEImage(logo_data, 'png')
-        img_part.add_header('Content-ID', '<suros_logo>')
-        img_part.add_header('Content-Disposition', 'inline', filename='suros-logo.png')
+        img_part.add_header('Content-ID', '<suros_header>')
+        img_part.add_header('Content-Disposition', 'inline', filename='suros-header.png')
         msg.attach(img_part)
     else:
         msg = MIMEMultipart('alternative')
@@ -360,7 +356,7 @@ def _send_smtp_sync(smtp_server, smtp_port, username, password, recipient, subje
         msg['From'] = username
         msg['To'] = recipient
         part1 = MIMEText(body, 'plain', 'utf-8')
-        part2 = MIMEText(build_html_email(subject, body), 'html', 'utf-8')
+        part2 = MIMEText(build_html_email(subject, body, timezone_name=timezone_name), 'html', 'utf-8')
         msg.attach(part1)
         msg.attach(part2)
     
@@ -385,12 +381,13 @@ def _send_smtp_sync(smtp_server, smtp_port, username, password, recipient, subje
                 pass
 
 async def send_email_alert(settings, subject, body):
+    tz = getattr(settings, 'timezone', 'Asia/Kolkata') or 'Asia/Kolkata'
     if settings.email_provider == "resend":
         api_key = settings.email_password
         recipient = settings.email_recipient
         if not api_key or not recipient:
             return False, "Missing Resend API Key or recipient"
-        return await send_email_resend(api_key, recipient, subject, body)
+        return await send_email_resend(api_key, recipient, subject, body, timezone_name=tz)
     else:
         smtp_server = settings.email_smtp_server
         smtp_port = settings.email_smtp_port
@@ -420,7 +417,8 @@ async def send_email_alert(settings, subject, body):
             password,
             recipient,
             subject,
-            body
+            body,
+            timezone_name=tz
         )
 
 async def send_ntfy_alert(settings, title, message):

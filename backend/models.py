@@ -77,6 +77,7 @@ class Settings(Base):
     polling_rate = Column(Float, default=30.0)
     smart_schedule = Column(String, default="daily")
     smart_time = Column(String, default="03:00")
+    timezone = Column(String, default="Asia/Kolkata")
 
 class DriveAlias(Base):
     __tablename__ = "drive_aliases"
