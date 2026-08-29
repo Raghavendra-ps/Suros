@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-axios.defaults.timeout = 5000;
+axios.defaults.timeout = 10000;
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import {
@@ -141,7 +141,9 @@ const App = () => {
     ntfy_url: 'https://ntfy.sh',
     ntfy_topic: '',
     ntfy_token: '',
-    polling_rate: 30
+    polling_rate: 30,
+    smart_schedule: 'daily',
+    smart_time: '03:00'
   });
   const [activeSettingsTab, setActiveSettingsTab] = useState('email');
   const [activeTemplateKey, setActiveTemplateKey] = useState('host_outage');
@@ -272,23 +274,56 @@ const App = () => {
   };
 
   useEffect(() => {
-    const init = async () => {
-      await Promise.all([fetchSettings(), fetchSites(), fetchStats(), fetchSystemMetrics(), fetchSystemHistory(), fetchDrives(), fetchProcesses()]);
-      setIsLoading(false);
-    };
     let pollingStopped = false;
     let pollingTimeout;
-    const pollDashboard = async () => {
-      await Promise.all([fetchSites(), fetchStats(), fetchSystemHistory(), fetchDrives(), fetchProcesses(), fetchSystemMetrics()]);
-      if (!pollingStopped) pollingTimeout = setTimeout(pollDashboard, pollingRate * 1000);
+
+    const executeDashboardPoll = async () => {
+      try {
+        await Promise.allSettled([
+          fetchSites(),
+          fetchStats(),
+          fetchSystemHistory(),
+          fetchDrives(),
+          fetchProcesses(),
+          fetchSystemMetrics()
+        ]);
+      } catch (err) {
+        console.error('Error during dashboard polling batch:', err);
+      } finally {
+        if (!pollingStopped) {
+          pollingTimeout = setTimeout(executeDashboardPoll, pollingRate * 1000);
+        }
+      }
     };
-    init().then(() => {
-      if (!pollingStopped) pollingTimeout = setTimeout(pollDashboard, pollingRate * 1000);
-    });
+
+    const init = async () => {
+      try {
+        await Promise.allSettled([
+          fetchSettings(),
+          fetchSites(),
+          fetchStats(),
+          fetchSystemMetrics(),
+          fetchSystemHistory(),
+          fetchDrives(),
+          fetchProcesses()
+        ]);
+      } catch (err) {
+        console.error('Error during initial dashboard load:', err);
+      } finally {
+        setIsLoading(false);
+        if (!pollingStopped) {
+          pollingTimeout = setTimeout(executeDashboardPoll, pollingRate * 1000);
+        }
+      }
+    };
+
+    init();
 
     return () => {
       pollingStopped = true;
-      clearTimeout(pollingTimeout);
+      if (pollingTimeout) {
+        clearTimeout(pollingTimeout);
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pollingRate]);
@@ -699,7 +734,7 @@ const App = () => {
             {activeSettingsTab === 'polling' && (
               <div className="settings-section-fields">
                 <div className="form-group">
-                  <label>Polling interval (seconds)</label>
+                  <label>Metrics Polling Interval (seconds)</label>
                   <input
                     type="number"
                     min="0.5"
@@ -707,10 +742,39 @@ const App = () => {
                     value={draftSettings.polling_rate ?? 30}
                     onChange={(e) => setDraftSettings({ ...draftSettings, polling_rate: Math.max(0.5, Number(e.target.value) || 0.5) })}
                   />
+                  <span style={{ fontSize: '0.62rem', color: 'var(--text3)', marginTop: '4px', fontFamily: 'DM Mono' }}>
+                    Controls live refresh speed for sites, CPU, RAM, GPU, network, and processes.
+                  </span>
                 </div>
-                <div className="settings-save-row">
+
+                <div className="form-group" style={{ marginTop: '1.2rem', paddingTop: '1.2rem', borderTop: '1px solid var(--border)' }}>
+                  <label>S.M.A.R.T Drive Scan Schedule</label>
+                  <select
+                    value={draftSettings.smart_schedule || 'daily'}
+                    onChange={(e) => setDraftSettings({ ...draftSettings, smart_schedule: e.target.value })}
+                  >
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly (Sundays)</option>
+                    <option value="monthly">Monthly (1st of month)</option>
+                    <option value="yearly">Yearly (Jan 1st)</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>S.M.A.R.T Scan Time (HH:MM)</label>
+                  <input
+                    type="time"
+                    value={draftSettings.smart_time || '03:00'}
+                    onChange={(e) => setDraftSettings({ ...draftSettings, smart_time: e.target.value })}
+                  />
+                  <span style={{ fontSize: '0.62rem', color: 'var(--text3)', marginTop: '4px', fontFamily: 'DM Mono' }}>
+                    Drives will run health diagnostics automatically at this time rather than continuous polling.
+                  </span>
+                </div>
+
+                <div className="settings-save-row" style={{ marginTop: '1rem' }}>
                   <button className="btn btn-accent" onClick={handleSaveDraft} disabled={saveStatus === 'saving'}>
-                    {saveStatus === 'saved' ? '✓ Saved' : 'Save Polling Rate'}
+                    {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? '✓ Saved' : saveStatus === 'error' ? '✗ Error' : 'Save Polling & Schedule'}
                   </button>
                 </div>
               </div>
@@ -1171,10 +1235,10 @@ const App = () => {
                 <span className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   Monitored Sites
                   <span style={{ color: '#2fa87e', fontWeight: 'bold', fontSize: '0.85rem', background: 'rgba(47,168,126,0.1)', padding: '2px 8px', borderRadius: '4px' }}>
-                    {sites.filter(s => s.status === 'online').length}
+                    {sites.filter(s => s && (s.status === 'success' || s.status === 'lan_up')).length}
                   </span>
                   <span style={{ color: '#c84b2f', fontWeight: 'bold', fontSize: '0.85rem', background: 'rgba(200,75,47,0.1)', padding: '2px 8px', borderRadius: '4px' }}>
-                    {sites.filter(s => s.status !== 'online').length}
+                    {sites.filter(s => s && s.status !== 'success' && s.status !== 'lan_up').length}
                   </span>
                 </span>
               </div>

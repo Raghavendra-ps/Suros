@@ -5,9 +5,14 @@ services:
     container_name: Suros-Backend
     ports:
       - "7689:8000"
+    environment:
+      - DATA_DIR=/app/data
+      - LOG_DIR=/app/logs
     volumes:
       - ./backend:/app
-      - ./backend/static:/app/static
+      - suros-data:/app/data
+      - suros-logs:/app/logs
+      - suros-static:/app/static
       - /:/mnt/host:ro
     restart: always
     privileged: true
@@ -30,10 +35,18 @@ services:
     depends_on:
       - backend
     volumes:
-      - ./frontend/static:/usr/share/nginx/html/static:ro
+      - suros-static:/usr/share/nginx/html/static:ro
     restart: always
     networks:
       - Suros-Network
+
+volumes:
+  suros-data:
+    name: suros-data
+  suros-logs:
+    name: suros-logs
+  suros-static:
+    name: suros-static
 
 networks:
   Suros-Network:

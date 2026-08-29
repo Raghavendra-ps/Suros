@@ -75,6 +75,8 @@ class Settings(Base):
     test_title = Column(String, default="Test Alert")
     test_body = Column(String, default="This is a test alert notification from your Suros dashboard.")
     polling_rate = Column(Float, default=30.0)
+    smart_schedule = Column(String, default="daily")
+    smart_time = Column(String, default="03:00")
 
 class DriveAlias(Base):
     __tablename__ = "drive_aliases"

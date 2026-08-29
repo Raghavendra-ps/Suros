@@ -17,19 +17,23 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import models
-from database import SessionLocal, engine, get_db
+from database import SessionLocal, engine, get_db, DB_PATH, DATA_DIR
 from pydantic import BaseModel
 from typing import List, Optional
 
 # --- Logging Setup ---
-os.makedirs("logs", exist_ok=True)
+LOG_DIR = os.getenv("LOG_DIR", "/app/logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+APP_LOG_FILE = os.path.join(LOG_DIR, "app.log")
+STATUS_LOG_FILE = os.path.join(LOG_DIR, "status.log")
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger("suros-backend")
-file_handler = logging.FileHandler("logs/app.log")
+file_handler = logging.FileHandler(APP_LOG_FILE)
 file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 logger.addHandler(file_handler)
 
@@ -48,7 +52,7 @@ try:
     # Run SQLite migration checks to automatically add missing settings columns
     import sqlite3
     try:
-        conn = sqlite3.connect("./uptime.db")
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("PRAGMA table_info(settings)")
         existing_cols = [row[1] for row in cursor.fetchall()]
@@ -75,7 +79,9 @@ try:
             ("site_recovery_body", "VARCHAR DEFAULT 'The site {site_name} ({site_url}) passed subsequent checks and is back ONLINE. Current status: {status}.'"),
             ("test_title", "VARCHAR DEFAULT 'Test Alert'"),
             ("test_body", "VARCHAR DEFAULT 'This is a test alert notification from your Suros dashboard.'"),
-            ("polling_rate", "FLOAT DEFAULT 30.0")
+            ("polling_rate", "FLOAT DEFAULT 30.0"),
+            ("smart_schedule", "VARCHAR DEFAULT 'daily'"),
+            ("smart_time", "VARCHAR DEFAULT '03:00'")
         ]
         
         for col_name, col_type in new_columns:
@@ -88,7 +94,7 @@ try:
     except Exception as em:
         logger.error(f"Migration failed: {em}")
     try:
-        conn = sqlite3.connect("./uptime.db")
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("PRAGMA table_info(system_history)")
         existing_cols = [row[1] for row in cursor.fetchall()]
@@ -105,7 +111,7 @@ try:
     except Exception as em:
         logger.error(f"System history migration failed: {em}")
     try:
-        conn = sqlite3.connect("./uptime.db")
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("PRAGMA table_info(sites)")
         existing_cols = [row[1] for row in cursor.fetchall()]
@@ -190,6 +196,8 @@ class SettingsSchema(BaseModel):
     test_title: Optional[str] = "Test Alert"
     test_body: Optional[str] = "This is a test alert notification from your Suros dashboard."
     polling_rate: Optional[float] = 30.0
+    smart_schedule: Optional[str] = "daily"
+    smart_time: Optional[str] = "03:00"
 
     class Config:
         from_attributes = True
@@ -510,17 +518,22 @@ class DriveAliasCreate(BaseModel):
     device: str
     alias: str
 
+LAST_STATUS_LOG_HOUR = -1
+LAST_STATUS_LOG_NET = None
+
 def write_hourly_status_log(network_online: bool):
+    global LAST_STATUS_LOG_HOUR, LAST_STATUS_LOG_NET
     try:
-        os.makedirs("logs", exist_ok=True)
         now = datetime.now()
-        filename = "logs/status.log"
-        # Format: timestamp,network_status,power_status
-        timestamp = now.isoformat()
-        net_status = "online" if network_online else "offline"
-        line = f"{timestamp},{net_status},online\n"
-        with open(filename, "a") as f:
-            f.write(line)
+        # Only write on network state change or once every hour to protect storage wear
+        if LAST_STATUS_LOG_NET != network_online or LAST_STATUS_LOG_HOUR != now.hour:
+            timestamp = now.isoformat()
+            net_status = "online" if network_online else "offline"
+            line = f"{timestamp},{net_status},online\n"
+            with open(STATUS_LOG_FILE, "a") as f:
+                f.write(line)
+            LAST_STATUS_LOG_HOUR = now.hour
+            LAST_STATUS_LOG_NET = network_online
     except Exception as e:
         logger.error(f"Error writing status log: {e}")
 
@@ -528,27 +541,24 @@ def calculate_outages_from_logs():
     network_outages = 0
     power_outages = 0
     try:
-        if not os.path.exists("logs"):
+        if not os.path.exists(STATUS_LOG_FILE):
             return 0, 0
         
-        files = ["status.log"] if os.path.exists("logs/status.log") else []
         entries = []
-        
-        for file in files:
-            try:
-                with open(os.path.join("logs", file), "r") as f:
-                    for line in f:
-                        parts = line.strip().split(",")
-                        if len(parts) == 3:
-                            try:
-                                t = datetime.fromisoformat(parts[0])
-                                net_stat = parts[1]
-                                power_stat = parts[2]
-                                entries.append((t, net_stat, power_stat))
-                            except Exception:
-                                pass
-            except Exception:
-                pass
+        try:
+            with open(STATUS_LOG_FILE, "r") as f:
+                for line in f:
+                    parts = line.strip().split(",")
+                    if len(parts) == 3:
+                        try:
+                            t = datetime.fromisoformat(parts[0])
+                            net_stat = parts[1]
+                            power_stat = parts[2]
+                            entries.append((t, net_stat, power_stat))
+                        except Exception:
+                            pass
+        except Exception:
+            pass
         
         entries.sort(key=lambda x: x[0])
         
@@ -895,11 +905,12 @@ async def daily_export_task():
                         ]
                     })
                 
-                os.makedirs("exports", exist_ok=True)
-                filename = f"exports/history_{now.strftime('%Y-%m-%d')}.json"
+                exports_dir = os.path.join(DATA_DIR, "exports")
+                os.makedirs(exports_dir, exist_ok=True)
+                filename = os.path.join(exports_dir, f"history_{now.strftime('%Y-%m-%d')}.json")
                 with open(filename, "w") as f:
                     json.dump(export_data, f, indent=2)
-                print(f"Daily export saved: {filename}")
+                logger.info(f"Daily export saved: {filename}")
             except Exception as e:
                 print(f"Export error: {e}")
             finally:
@@ -1073,16 +1084,17 @@ def get_system_history(db: Session = Depends(get_db)):
 def get_logs(limit: int = 100):
     entries = []
     try:
-        with open("logs/app.log", "r") as log_file:
-            entries.extend(line.rstrip() for line in log_file.readlines()[-limit:])
-    except FileNotFoundError:
-        pass
+        if os.path.exists(APP_LOG_FILE):
+            with open(APP_LOG_FILE, "r") as log_file:
+                entries.extend(line.rstrip() for line in log_file.readlines()[-limit:])
+    except Exception as e:
+        logger.error(f"Error reading app log: {e}")
     return {"entries": entries}
 
 @app.delete("/api/logs/application")
 def clear_application_logs():
     try:
-        with open("logs/app.log", "w"):
+        with open(APP_LOG_FILE, "w"):
             pass
         return {"status": "cleared"}
     except OSError as error:
@@ -1416,7 +1428,9 @@ def get_settings(db: Session = Depends(get_db)):
             ntfy_url="https://ntfy.sh",
             ntfy_topic=None,
             ntfy_token=None,
-            polling_rate=30.0
+            polling_rate=30.0,
+            smart_schedule="daily",
+            smart_time="03:00"
         )
         db.add(settings)
         db.commit()
@@ -1446,7 +1460,9 @@ def update_settings(settings_data: SettingsSchema, db: Session = Depends(get_db)
                 "site_outage_title", "site_outage_body", "site_recovery_title", "site_recovery_body",
                 "test_title", "test_body"
             )},
-            polling_rate=max(0.5, float(settings_data.polling_rate or 30.0))
+            polling_rate=max(0.5, float(settings_data.polling_rate or 30.0)),
+            smart_schedule=settings_data.smart_schedule or "daily",
+            smart_time=settings_data.smart_time or "03:00"
         )
         db.add(settings)
     else:
@@ -1471,6 +1487,8 @@ def update_settings(settings_data: SettingsSchema, db: Session = Depends(get_db)
         ):
             setattr(settings, field, getattr(settings_data, field))
         settings.polling_rate = max(0.5, float(settings_data.polling_rate or 30.0))
+        settings.smart_schedule = settings_data.smart_schedule or "daily"
+        settings.smart_time = settings_data.smart_time or "03:00"
     db.commit()
     return settings
 
@@ -1672,58 +1690,110 @@ async def get_all_drives_async():
 
 CACHED_DRIVES = []
 
-async def monitor_drives_task():
+async def scan_and_update_drives():
     global CACHED_DRIVES
+    try:
+        res = await asyncio.to_thread(subprocess.run, ["smartctl", "--scan"], capture_output=True, text=True, timeout=5)
+        scanned_devices = []
+        if res.returncode == 0 and res.stdout:
+            lines = res.stdout.strip().split("\n")
+            for line in lines:
+                if line.strip():
+                    parts = line.split()
+                    if parts:
+                        scanned_devices.append(parts[0])
+        
+        new_drives = []
+        if scanned_devices:
+            tasks = [asyncio.to_thread(check_drive_smart_status, dev) for dev in scanned_devices]
+            results = await asyncio.gather(*tasks)
+            
+            for dev, result in zip(scanned_devices, results):
+                dev_upper = dev.upper()
+                if result is not None:
+                    new_drives.append(result)
+                else:
+                    old_entry = next((d for d in CACHED_DRIVES if d["device"].upper() == dev_upper), None)
+                    if old_entry:
+                        new_drives.append(old_entry)
+        
+        if not new_drives and not CACHED_DRIVES:
+            now = datetime.now()
+            date_str = now.strftime("%B %d, %Y")
+            CACHED_DRIVES = [
+                {"device": "/DEV/SDA", "model": "SAMSUNG_SSD_860_EVO_500GB", "status": "Passed", "temperature": 37, "capacity": "465.8 GB", "powered_on": "1.6 years", "last_updated": date_str},
+                {"device": "/DEV/SDB", "model": "WDC_WD140EDFZ-11A0VA0", "status": "Passed", "temperature": 33, "capacity": "12.73 TB", "powered_on": "131.3 days", "last_updated": date_str},
+                {"device": "/DEV/SDC", "model": "WDC_WD140EDFZ-11A0VA0", "status": "Passed", "temperature": 31, "capacity": "12.73 TB", "powered_on": "131.3 days", "last_updated": date_str},
+                {"device": "/DEV/SDD", "model": "WDC_WD80EFAX-68LHPN0", "status": "Passed", "temperature": 30, "capacity": "7.28 TB", "powered_on": "2.9 years", "last_updated": date_str},
+                {"device": "/DEV/SDE", "model": "WDC_WD140EDFZ-11A0VA0", "status": "Passed", "temperature": 29, "capacity": "12.73 TB", "powered_on": "131.3 days", "last_updated": date_str},
+                {"device": "/DEV/SDF", "model": "WDC_WD60EFRX-68MYMN1", "status": "Passed", "temperature": 30, "capacity": "5.46 TB", "powered_on": "5.4 years", "last_updated": date_str}
+            ]
+        elif new_drives:
+            CACHED_DRIVES = new_drives
+    except Exception as e:
+        logger.error(f"Error in scan_and_update_drives: {e}")
+
+async def monitor_drives_task():
+    # Initial scan on startup
+    await scan_and_update_drives()
+    last_run_tag = None
+
     while True:
-        polling_rate = 300.0
         try:
+            now = datetime.now()
             settings_db = SessionLocal()
             settings = settings_db.query(models.Settings).first()
-            polling_rate = max(0.5, float(settings.polling_rate or 30.0)) if settings else 300.0
+            schedule_type = (settings.smart_schedule if settings and settings.smart_schedule else "daily").lower()
+            schedule_time = (settings.smart_time if settings and settings.smart_time else "03:00").strip()
             settings_db.close()
-            res = await asyncio.to_thread(subprocess.run, ["smartctl", "--scan"], capture_output=True, text=True, timeout=2)
-            scanned_devices = []
-            if res.returncode == 0 and res.stdout:
-                lines = res.stdout.strip().split("\n")
-                for line in lines:
-                    if line.strip():
-                        parts = line.split()
-                        if parts:
-                            scanned_devices.append(parts[0])
+
+            # Parse target hour and minute
+            target_hour = 3
+            target_minute = 0
+            if ":" in schedule_time:
+                parts = schedule_time.split(":")
+                try:
+                    target_hour = int(parts[0])
+                    target_minute = int(parts[1])
+                except (ValueError, IndexError):
+                    target_hour = 3
+                    target_minute = 0
+
+            is_time_match = (now.hour == target_hour and now.minute == target_minute)
             
-            new_drives = []
-            if scanned_devices:
-                tasks = [asyncio.to_thread(check_drive_smart_status, dev) for dev in scanned_devices]
-                results = await asyncio.gather(*tasks)
-                
-                # Merge: if failed, use previous cached entry to prevent disappearing drives
-                for dev, result in zip(scanned_devices, results):
-                    dev_upper = dev.upper()
-                    if result is not None:
-                        new_drives.append(result)
-                    else:
-                        old_entry = next((d for d in CACHED_DRIVES if d["device"].upper() == dev_upper), None)
-                        if old_entry:
-                            new_drives.append(old_entry)
-            
-            # If no drives found, generate fallback entries
-            if not new_drives and not CACHED_DRIVES:
-                now = datetime.now()
-                date_str = now.strftime("%B %d, %Y")
-                CACHED_DRIVES = [
-                    {"device": "/DEV/SDA", "model": "SAMSUNG_SSD_860_EVO_500GB", "status": "Passed", "temperature": 37, "capacity": "465.8 GB", "powered_on": "1.6 years", "last_updated": date_str},
-                    {"device": "/DEV/SDB", "model": "WDC_WD140EDFZ-11A0VA0", "status": "Passed", "temperature": 33, "capacity": "12.73 TB", "powered_on": "131.3 days", "last_updated": date_str},
-                    {"device": "/DEV/SDC", "model": "WDC_WD140EDFZ-11A0VA0", "status": "Passed", "temperature": 31, "capacity": "12.73 TB", "powered_on": "131.3 days", "last_updated": date_str},
-                    {"device": "/DEV/SDD", "model": "WDC_WD80EFAX-68LHPN0", "status": "Passed", "temperature": 30, "capacity": "7.28 TB", "powered_on": "2.9 years", "last_updated": date_str},
-                    {"device": "/DEV/SDE", "model": "WDC_WD140EDFZ-11A0VA0", "status": "Passed", "temperature": 29, "capacity": "12.73 TB", "powered_on": "131.3 days", "last_updated": date_str},
-                    {"device": "/DEV/SDF", "model": "WDC_WD60EFRX-68MYMN1", "status": "Passed", "temperature": 30, "capacity": "5.46 TB", "powered_on": "5.4 years", "last_updated": date_str}
-                ]
-            elif new_drives:
-                CACHED_DRIVES = new_drives
+            should_run = False
+            current_tag = None
+
+            if is_time_match:
+                if schedule_type == "daily":
+                    current_tag = now.strftime("%Y-%m-%d")
+                    should_run = (last_run_tag != current_tag)
+                elif schedule_type == "weekly":
+                    # Run on Sunday (weekday 6)
+                    if now.weekday() == 6:
+                        current_tag = now.strftime("%Y-W%W")
+                        should_run = (last_run_tag != current_tag)
+                elif schedule_type == "monthly":
+                    # Run on 1st day of month
+                    if now.day == 1:
+                        current_tag = now.strftime("%Y-%m")
+                        should_run = (last_run_tag != current_tag)
+                elif schedule_type == "yearly":
+                    # Run on Jan 1
+                    if now.month == 1 and now.day == 1:
+                        current_tag = now.strftime("%Y")
+                        should_run = (last_run_tag != current_tag)
+
+            if should_run:
+                logger.info(f"Triggering scheduled SMART scan ({schedule_type} at {schedule_time})...")
+                await scan_and_update_drives()
+                last_run_tag = current_tag
+
         except Exception as e:
             logger.error(f"Error in monitor_drives_task: {e}")
         
-        await asyncio.sleep(polling_rate)
+        # Check every 30 seconds
+        await asyncio.sleep(30)
 
 @app.get("/api/drives")
 async def get_drives_endpoint(db: Session = Depends(get_db)):
