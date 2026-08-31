@@ -4,6 +4,7 @@ import requests
 import psutil
 import subprocess
 import smtplib
+import glob
 from email.mime.text import MIMEText
 from email.header import Header
 import httpx
@@ -589,20 +590,46 @@ def check_site_status(url: str):
         return "down", None
 
 
-def get_gpu_metrics():
-    """Query NVIDIA GPU metrics via nvidia-smi. Returns None if unavailable (no proprietary driver)."""
+def get_gpu_temp():
+    """Retrieve GPU temperature from hwmon sensors (e.g. nouveau, amdgpu, radeon)."""
     try:
-        # Check if nvidia-smi exists first
-        subprocess.check_call(["which", "nvidia-smi"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # Check psutil sensor temperatures
+        temps = psutil.sensors_temperatures() if hasattr(psutil, 'sensors_temperatures') else {}
+        if temps:
+            for name, entries in temps.items():
+                if name in ['nouveau', 'amdgpu', 'radeon'] and entries:
+                    return round(entries[0].current, 1)
+                
+        # Direct sysfs hwmon fallback (checking container /sys and /mnt/host/sys)
+        hwmon_paths = glob.glob("/sys/class/hwmon/hwmon*/name") + glob.glob("/mnt/host/sys/class/hwmon/hwmon*/name")
+        for path in hwmon_paths:
+            try:
+                with open(path, "r") as f:
+                    driver = f.read().strip().lower()
+                    if driver in ["nouveau", "amdgpu", "radeon"]:
+                        input_path = path.replace("name", "temp1_input")
+                        if os.path.exists(input_path):
+                            with open(input_path, "r") as tf:
+                                millidegrees = int(tf.read().strip())
+                                return round(millidegrees / 1000.0, 1)
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return None
+
+def get_gpu_metrics():
+    """Query GPU metrics via nvidia-smi with fallback to sysfs (nouveau / amdgpu / drm)."""
+    # 1. Try NVIDIA via nvidia-smi
+    try:
         cmd = ["nvidia-smi", "--query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu", "--format=csv,noheader,nounits"]
-        output = subprocess.check_output(cmd, encoding='utf-8').strip()
+        output = subprocess.check_output(cmd, encoding='utf-8', timeout=2).strip()
         if output:
             lines = output.split('\n')
             results = []
             for line in lines:
                 parts = [p.strip() for p in line.split(',')]
                 if len(parts) == 4:
-                    # Older GPUs may return "[N/A]" or "N/A" for utilization/temp
                     util_str = parts[0].replace("[", "").replace("]", "").strip()
                     util = int(util_str) if util_str.isdigit() else 0
                     
@@ -623,10 +650,62 @@ def get_gpu_metrics():
                         },
                         "temp": temp
                     })
-            return results[0] if results else None
+            if results:
+                return results[0]
+    except Exception:
+        pass
+
+    # 2. Sysfs fallback for AMD / DRM / Nouveau
+    try:
+        gpu_temp = get_gpu_temp()
+        mem_used_gb = 0.0
+        mem_total_gb = 0.0
+        vram_found = False
+        
+        # Check AMD / DRM VRAM info
+        vram_used_paths = glob.glob("/sys/class/drm/card*/device/mem_info_vram_used") + glob.glob("/mnt/host/sys/class/drm/card*/device/mem_info_vram_used")
+        for used_path in vram_used_paths:
+            try:
+                total_path = used_path.replace("mem_info_vram_used", "mem_info_vram_total")
+                if os.path.exists(total_path):
+                    with open(used_path, "r") as fu, open(total_path, "r") as ft:
+                        u_bytes = float(fu.read().strip())
+                        t_bytes = float(ft.read().strip())
+                        if t_bytes > 0:
+                            mem_used_gb = round(u_bytes / (1024 ** 3), 2)
+                            mem_total_gb = round(t_bytes / (1024 ** 3), 2)
+                            vram_found = True
+                            break
+            except Exception:
+                pass
+        
+        # Check GPU busy / utilization percentage (e.g. AMD gpu_busy_percent)
+        util = 0
+        busy_paths = glob.glob("/sys/class/drm/card*/device/gpu_busy_percent") + glob.glob("/mnt/host/sys/class/drm/card*/device/gpu_busy_percent")
+        for busy_path in busy_paths:
+            try:
+                with open(busy_path, "r") as fb:
+                    b_val = fb.read().strip()
+                    if b_val.isdigit():
+                        util = int(b_val)
+                        break
+            except Exception:
+                pass
+
+        driver_links = glob.glob("/sys/class/drm/card*/device/driver") + glob.glob("/mnt/host/sys/class/drm/card*/device/driver")
+        if gpu_temp is not None or vram_found or driver_links:
+            # A GPU device exists
+            return {
+                "util": util,
+                "memory": {
+                    "used": mem_used_gb,
+                    "total": mem_total_gb
+                },
+                "temp": gpu_temp
+            }
     except Exception as e:
-        logger.error(f"Error reading GPU metrics: {e}")
-        return None
+        logger.error(f"Error reading sysfs GPU metrics: {e}")
+
     return None
 
 def get_cpu_temp():
@@ -1223,9 +1302,29 @@ def get_system_metrics(db: Session = Depends(get_db)):
         if gpu:
             try:
                 cmd = ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"]
-                gpu_name = subprocess.check_output(cmd, encoding='utf-8').strip()
+                gpu_name = subprocess.check_output(cmd, encoding='utf-8', timeout=2).strip()
             except Exception:
-                gpu_name = "NVIDIA GPU"
+                pass
+            
+            if not gpu_name:
+                # Detect via DRM driver
+                driver_links = glob.glob("/sys/class/drm/card*/device/driver") + glob.glob("/mnt/host/sys/class/drm/card*/device/driver")
+                for driver_link in driver_links:
+                    try:
+                        driver_name = os.path.basename(os.path.realpath(driver_link))
+                        if driver_name == "nouveau":
+                            gpu_name = "NVIDIA GPU (Nouveau)"
+                            break
+                        elif driver_name in ["amdgpu", "radeon"]:
+                            gpu_name = "AMD GPU"
+                            break
+                        elif driver_name in ["i915", "xe"]:
+                            gpu_name = "Intel GPU"
+                            break
+                    except Exception:
+                        pass
+            if not gpu_name:
+                gpu_name = "GPU"
 
         return {
             "cpu": cpu_percent,
@@ -1252,7 +1351,7 @@ def get_system_metrics(db: Session = Depends(get_db)):
             "gpu": gpu,
             "temp": {
                 "cpu": get_cpu_temp(),
-                "gpu": gpu['temp'] if gpu else None
+                "gpu": gpu['temp'] if (gpu and gpu.get('temp') is not None) else get_gpu_temp()
             },
             "uptime": round(time.time() - psutil.boot_time(), 0),
             "cpu_cores": cpu_cores,
