@@ -579,7 +579,7 @@ def check_site_status(url: str):
             latency = (time.time() - t0) * 1000
 
             if resp.status_code < 400:
-                if latency < 100:
+                if latency < 10:
                     return "lan_up", latency
                 return "success", latency
             # Any HTTP error, including 404, 502, and Cloudflare 1033, is an outage.
