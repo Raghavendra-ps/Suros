@@ -273,6 +273,16 @@ const App = () => {
     }
   };
 
+  const clearOutageLogs = async () => {
+    try {
+      await axios.delete('/api/logs/outages');
+      alert('Outage counter reset successfully!');
+    } catch (err) {
+      console.error('Error clearing outage logs:', err);
+      alert('Failed to reset outage counter');
+    }
+  };
+
   useEffect(() => {
     let pollingStopped = false;
     let pollingTimeout;
@@ -971,6 +981,7 @@ const App = () => {
                 <div className="logging-actions">
                   <button className="btn" onClick={fetchLogs}>Refresh Logs</button>
                   <button className="btn logging-clear-btn" onClick={clearLogs}>Clear Application Logs</button>
+                  <button className="btn logging-clear-btn" onClick={clearOutageLogs}>Reset Outage Counter</button>
                 </div>
               </div>
             )}

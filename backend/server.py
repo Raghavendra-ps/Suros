@@ -1189,6 +1189,17 @@ def clear_application_logs():
         logger.error(f"Error clearing application logs: {error}")
         raise HTTPException(status_code=500, detail="Unable to clear application logs")
 
+@app.delete("/api/logs/outages")
+def clear_outage_logs(db: Session = Depends(get_db)):
+    try:
+        db.query(models.OutageEvent).delete()
+        db.commit()
+        return {"status": "cleared"}
+    except Exception as error:
+        logger.error(f"Error clearing outage logs: {error}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Unable to clear outage logs")
+
 LAST_NET_IO = {"rx": 0, "tx": 0, "time": 0.0}
 
 def get_host_partitions():
