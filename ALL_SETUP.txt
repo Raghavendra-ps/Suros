@@ -1,0 +1,516 @@
+# 🚀 Suros First-Time Setup Guide
+
+## Complete Automated Setup (Recommended)
+
+Run this single command to configure everything:
+
+```bash
+sudo bash /root/setup-suros.sh
+```
+
+This **comprehensive setup script** will:
+
+### ✓ Phase 1: Systemd Internet Monitoring
+- Install systemd service for host-level internet monitoring
+- Create monitoring script at `/root/suros-internet-monitor.sh`
+- Enable automatic startup on system boot
+- Start the service immediately
+
+### ✓ Phase 2: Port Configuration  
+- Prompt you for custom backend API port (default: 7689)
+- Prompt you for custom frontend web port (default: 8755)
+- Validate port numbers (must be 1024-65535 and not in use)
+
+### ✓ Phase 3: Docker Compose Deployment
+- Pull latest images
+- Build Docker containers with your custom port settings
+- Start all services (backend + frontend)
+- Wait for services to stabilize
+
+### ✓ Phase 4: System Verification
+- Verify all services are running
+- Display systemd service status
+- Show access URLs with your configured ports
+
+---
+
+## What Happens During Setup
+
+The setup script provides a beautiful **Terminal User Interface (TUI)** that:
+- Shows progress bars for each major step
+- Validates prerequisites (Docker, Docker Compose, systemd)
+- Uses color-coded output for easy reading
+- Asks for port configurations interactively
+- Provides helpful command references at the end
+
+**Expected duration:** 2-3 minutes
+
+---
+
+## Manual Setup (If Preferred)
+
+If you prefer to set things up step-by-step:
+
+### Step 1: Start Suros Manually
+
+```bash
+cd /root/Suros
+docker-compose up -d --build
+```
+
+### Step 2: Setup Systemd Monitoring (One-Time Only)
+
+```bash
+bash /root/setup-suros-monitor.sh
+```
+
+### Step 3: Verify Everything is Working
+
+**Check if the monitoring service is running:**
+```bash
+sudo systemctl status suros-internet-monitor
+```
+
+**View real-time outage logs:**
+```bash
+sudo journalctl -u suros-internet-monitor -f
+```
+
+**Check the outage log file:**
+```bash
+cat /root/suros-outages.log
+```
+
+**Access the dashboard:**
+Open your browser to: `http://localhost:8755` (or custom port if configured)
+
+---
+
+## Setup Script Features
+
+### 🎨 Beautiful Terminal UI
+The setup script provides visual feedback throughout the process:
+- **ASCII Art Logo** - Suros branding at startup
+- **Color-Coded Messages**:
+  - 🟢 Green `[✓]` for successful steps
+  - 🔴 Red `[✗]` for errors
+  - 🔵 Blue `[i]` for informational messages
+  - 🟡 Yellow `[!]` for warnings
+  - 🟣 Magenta `[?]` for user input prompts
+- **Progress Bars** - Visual indication of setup progress
+- **Structured Sections** - Organized output with clear sections
+
+### 🔧 Interactive Port Configuration
+During setup, you'll be prompted:
+```
+? Backend API port (default: 7689): █
+```
+
+You can:
+- Press Enter to use the default port
+- Type a custom port number (must be 1024-65535)
+- The script validates your input and asks again if invalid
+
+### ✅ Pre-Flight Checks
+Before proceeding, the script verifies:
+- Running with `sudo` (required for systemd)
+- Docker is installed
+- Docker Compose is available
+- Suros directory exists at `/root/Suros`
+- Systemd is available
+
+If any check fails, setup stops with a clear error message.
+
+### 📊 Real-Time Status
+At the end of setup, you get:
+- Current systemd service status
+- Exact URLs to access your dashboard
+- Useful command references
+- Next steps to get started
+
+---
+
+## What Gets Installed
+
+The setup script creates/modifies these files:
+
+| File | Purpose |
+|------|---------|
+| `/root/suros-internet-monitor.sh` | Monitoring script (executable) |
+| `/etc/systemd/system/suros-internet-monitor.service` | Systemd unit file (auto-start enabled) |
+| `/root/suros-outages.log` | Shared outage event log |
+| `/root/Suros/docker-compose.yml` | Updated with your custom ports |
+| `/root/Suros/docker-compose.yml.bak` | Backup of original config |
+
+---
+
+## Architecture
+
+### Before Running Setup Script:
+- Only **Suros** container monitors network connectivity
+- If container crashes → outages are not logged
+- ❌ Cannot detect if host itself lost internet
+- ❌ Docker Compose uses default ports
+
+### After Running Setup Script:
+- **Suros** container monitors network (inside container perspective)
+- **Systemd service** monitors network independently (host perspective)
+- Both write to `/root/suros-outages.log`
+- Even if Suros crashes, the systemd monitor continues recording
+- ✓ Complete outage history including container downtime
+- ✓ Custom ports configured and services running
+- ✓ Automatic startup on system reboot
+
+## Daily Operations
+
+### View outage history in dashboard:
+1. Go to `Logging` tab → `Reset Outage Counter` section
+2. Click `Refresh` to see recent outage events
+
+### Reset outage counter:
+Use the `Reset Outage Counter` button in the Logging tab to clear all outage history.
+
+### Check service logs:
+```bash
+# Live logs
+sudo journalctl -u suros-internet-monitor -f
+
+# Last 50 entries
+sudo journalctl -u suros-internet-monitor -n 50
+
+# Logs from specific time
+sudo journalctl -u suros-internet-monitor --since "1 hour ago"
+```
+
+### Stop/restart monitoring:
+```bash
+# Stop
+sudo systemctl stop suros-internet-monitor
+
+# Restart
+sudo systemctl restart suros-internet-monitor
+
+# Disable (won't start on boot)
+sudo systemctl disable suros-internet-monitor
+```
+
+## Troubleshooting
+
+### Setup Script Issues
+
+**Error: "This script must be run as root"**
+```bash
+# Solution: Run with sudo
+sudo bash /root/setup-suros.sh
+```
+
+**Error: "Docker is not installed"**
+```bash
+# Solution: Install Docker
+# For Ubuntu/Debian:
+sudo apt-get update && sudo apt-get install -y docker.io
+```
+
+**Error: "Docker Compose is not available"**
+```bash
+# Solution: Install Docker Compose
+# For Ubuntu/Debian:
+sudo apt-get install -y docker-compose
+```
+
+**Error: "Suros directory not found at /root/Suros"**
+```bash
+# Solution: Clone or restore the Suros directory
+# Verify it exists:
+ls -la /root/Suros/
+```
+
+**Setup hangs during "Building Docker images"**
+- This can take 2-5 minutes depending on your internet speed
+- Be patient - the script is downloading and building images
+- If it hangs for >10 minutes, press Ctrl+C and check:
+  ```bash
+  docker ps
+  docker logs Suros-Backend
+  ```
+
+### Port Configuration Issues
+
+**Error: "Invalid port! Must be between 1024 and 65535"**
+- Ports below 1024 require root privileges
+- Choose a port in the 1024-65535 range
+- Common safe ports: 7689 (backend), 8755 (frontend)
+
+**Error: "Port already in use"**
+```bash
+# Check which process is using the port
+sudo lsof -i :PORTNUMBER
+
+# Kill the process or choose a different port
+```
+
+### Service Issues
+
+**Service not starting?**
+```bash
+sudo journalctl -u suros-internet-monitor -n 50
+```
+
+**Connection errors in monitor?**
+The script checks both `1.1.1.1:53` and `8.8.8.8:53`. If both fail for 3 consecutive checks, it logs an outage.
+
+**Need to reinstall the service?**
+```bash
+# Remove old service
+sudo systemctl stop suros-internet-monitor
+sudo systemctl disable suros-internet-monitor
+sudo rm /etc/systemd/system/suros-internet-monitor.service
+sudo systemctl daemon-reload
+
+# Reinstall
+sudo bash /root/setup-suros.sh
+```
+
+### Docker Container Issues
+
+**Containers won't start?**
+```bash
+# Check the logs
+cd /root/Suros
+docker compose logs -f
+
+# Restart containers
+docker compose restart
+```
+
+**Port mappings not applied?**
+```bash
+# Verify docker-compose.yml has correct ports
+cat /root/Suros/docker-compose.yml | grep -A 2 "ports:"
+
+# If wrong, restore backup and rerun setup
+cp /root/Suros/docker-compose.yml.bak /root/Suros/docker-compose.yml
+sudo bash /root/setup-suros.sh
+```
+
+## Files Created
+
+During setup, these files are created/modified:
+
+- `/root/suros-internet-monitor.sh` - The monitoring script
+- `/etc/systemd/system/suros-internet-monitor.service` - Systemd service file (auto-enabled)
+- `/root/suros-outages.log` - Shared outage log (read by Suros, written by both services)
+- `/root/Suros/docker-compose.yml` - Updated with your custom port mappings
+- `/root/Suros/docker-compose.yml.bak` - Backup of original configuration
+
+---
+
+**Need help?** Check the logs or review the technical documentation at `/root/SUROS_OUTAGE_SETUP.md`
+# Suros Sites Export/Import Feature
+
+## Overview
+
+Easily backup and transfer your monitored sites list between Suros instances.
+
+## Features
+
+✅ **Export** - Download all monitored sites to a JSON file  
+✅ **Import** - Upload sites from a previously exported file  
+✅ **Merge or Replace** - Choose whether to merge with existing sites or replace entirely  
+✅ **Duplicate Detection** - Automatically skips duplicate URLs during import  
+✅ **Validation** - Ensures all imported sites have valid names and URLs  
+
+## How to Use
+
+### Export Sites
+
+1. Go to the **Dashboard** tab
+2. Find the "**Monitored Sites**" card
+3. Click the **"↓ Export"** button
+4. A JSON file will download: `suros-sites-YYYY-MM-DD.json`
+
+**File Format:**
+```json
+{
+  "export_date": "2026-09-02T14:30:00.000000",
+  "site_count": 3,
+  "sites": [
+    {
+      "name": "My Portfolio",
+      "url": "https://example.com",
+      "icon": "Globe"
+    },
+    {
+      "name": "API Server",
+      "url": "https://api.example.com",
+      "icon": "Code"
+    }
+  ]
+}
+```
+
+### Import Sites
+
+1. Go to the **Dashboard** tab
+2. Find the "**Monitored Sites**" card
+3. Click the **"↑ Import"** button
+4. Select a previously exported `.json` file
+5. A dialog will ask:
+   - **"OK"** = Clear all existing sites and import the new ones
+   - **"Cancel"** = Keep existing sites and merge with imported ones
+6. Results will show how many sites were imported and any warnings
+
+## Use Cases
+
+### Backup Your Sites
+Export regularly to have a backup of your monitored sites list.
+
+### Transfer Between Instances
+1. Export from one Suros instance
+2. Import into another Suros instance
+3. All sites and their icons are preserved
+
+### Bulk Edit
+1. Export sites
+2. Edit the JSON file (change names, URLs, icons)
+3. Clear existing and re-import
+
+### Share Configuration
+Export your site list and share with team members.
+
+## Tips
+
+- **Export regularly** - Keep backups in case of data loss
+- **Name your files** - Use descriptive names like `suros-sites-production.json`
+- **Edit carefully** - If editing the JSON, ensure proper JSON syntax
+- **Check duplicates** - Importing will skip sites with duplicate URLs
+
+## API Endpoints
+
+### GET /api/sites/export
+Returns all monitored sites in JSON format.
+
+**Response:**
+```json
+{
+  "export_date": "2026-09-02T14:30:00.000000",
+  "site_count": 2,
+  "sites": [...]
+}
+```
+
+### POST /api/sites/import
+Import sites from JSON data.
+
+**Request Body:**
+```json
+{
+  "sites": [
+    {
+      "name": "Site Name",
+      "url": "https://example.com",
+      "icon": "Globe"
+    }
+  ],
+  "clear_existing": false
+}
+```
+
+**Response:**
+```json
+{
+  "imported": 2,
+  "skipped": 0,
+  "errors": [],
+  "message": "Imported 2 sites, skipped 0"
+}
+```
+
+## Troubleshooting
+
+### Import shows "Check file format" error
+- Ensure the file is valid JSON
+- Check that it has a `"sites"` array
+- Each site must have `name` and `url` fields
+
+### Import shows "Site already exists"
+- This site URL is already monitored
+- Choose "Cancel" instead of "OK" to merge, or remove the duplicate manually first
+
+### Missing icons after import
+- Icons default to "Globe" if not specified
+- You can edit individual sites to change the icon
+
+---
+
+Ready to try it? Go to the Dashboard and look for the **Export/Import** buttons! 🚀
+#!/bin/bash
+
+# Suros Systemd Service Auto-Setup
+# Run this after first docker-compose up to enable automatic outage monitoring
+
+echo "🔧 Setting up Suros Internet Outage Monitor as Systemd Service"
+echo ""
+
+# Check if already installed
+if [[ -f /etc/systemd/system/suros-internet-monitor.service ]]; then
+    echo "✓ Service is already installed!"
+    systemctl status suros-internet-monitor
+    exit 0
+fi
+
+# Check if script exists
+if [[ ! -f /root/suros-internet-monitor.sh ]]; then
+    echo "❌ Error: /root/suros-internet-monitor.sh not found!"
+    exit 1
+fi
+
+# Ensure script is executable
+chmod +x /root/suros-internet-monitor.sh
+
+# Create systemd service file
+sudo tee /etc/systemd/system/suros-internet-monitor.service > /dev/null << 'EOF'
+[Unit]
+Description=Suros Host Internet Outage Monitor
+After=network.target
+StartLimitBurst=5
+StartLimitIntervalSec=60s
+
+[Service]
+Type=simple
+ExecStart=/root/suros-internet-monitor.sh
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=suros-monitor
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+echo "✓ Created systemd service file"
+
+# Reload systemd
+sudo systemctl daemon-reload
+echo "✓ Reloaded systemd daemon"
+
+# Enable service
+sudo systemctl enable suros-internet-monitor
+echo "✓ Enabled suros-internet-monitor"
+
+# Start service
+sudo systemctl start suros-internet-monitor
+echo "✓ Started suros-internet-monitor"
+
+# Check status
+echo ""
+echo "📋 Service Status:"
+sudo systemctl status suros-internet-monitor
+
+echo ""
+echo "✅ Setup complete!"
+echo ""
+echo "To check logs: sudo journalctl -u suros-internet-monitor -f"
+echo "To stop: sudo systemctl stop suros-internet-monitor"
+echo "To restart: sudo systemctl restart suros-internet-monitor"
