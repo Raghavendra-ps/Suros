@@ -1,0 +1,17 @@
+[Unit]
+Description=Suros Host Internet Outage Monitor
+After=network.target
+StartLimitBurst=5
+StartLimitIntervalSec=60s
+
+[Service]
+Type=simple
+ExecStart=/root/suros-internet-monitor.sh
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=suros-monitor
+
+[Install]
+WantedBy=multi-user.target
