@@ -27,6 +27,7 @@ LOG_DIR = os.getenv("LOG_DIR", "/app/logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 APP_LOG_FILE = os.path.join(LOG_DIR, "app.log")
 STATUS_LOG_FILE = os.path.join(LOG_DIR, "status.log")
+OUTAGE_LOG_FILE = os.getenv("OUTAGE_LOG_FILE", "/root/suros-outages.log")  # Shared with systemd monitor
 
 logging.basicConfig(
     level=logging.INFO,
@@ -125,6 +126,28 @@ try:
         conn.close()
     except Exception as em:
         logger.error(f"Site alert migration failed: {em}")
+    
+    # Migrate OutageEvent records to text log file (one-time migration)
+    try:
+        from database import SessionLocal as MigrationSession
+        db_migrate = MigrationSession()
+        outage_events = db_migrate.query(models.OutageEvent).all()
+        if outage_events:
+            logger.info(f"Migrating {len(outage_events)} outage events to log file")
+            for event in outage_events:
+                timestamp = event.started_at.strftime('%Y-%m-%d %H:%M:%S') if event.started_at else datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+                log_outage_event('OUTAGE', f'Migrated from DB: {event.outage_type}')
+                if event.ended_at:
+                    timestamp_end = event.ended_at.strftime('%Y-%m-%d %H:%M:%S')
+                    log_outage_event('RECOVERY', f'Migrated from DB (ended at {timestamp_end})')
+            # Clear the database records after migration
+            db_migrate.query(models.OutageEvent).delete()
+            db_migrate.commit()
+            logger.info("OutageEvent migration complete")
+        db_migrate.close()
+    except Exception as em:
+        logger.warning(f"OutageEvent migration skipped: {em}")
+
 except Exception as e:
     logger.error(f"Database creation error: {e}")
 
@@ -747,10 +770,46 @@ def get_cpu_pressure():
             continue
     return None
 
+# --- Outage Log File Utilities ---
+def log_outage_event(event_type, message):
+    """Write outage/recovery event to shared log file."""
+    try:
+        current_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+        with open(OUTAGE_LOG_FILE, 'a') as f:
+            f.write(f"{current_time} | {event_type} | {message}\n")
+        logger.info(f"Logged outage event: {event_type} - {message}")
+    except Exception as e:
+        logger.error(f"Error writing outage event: {e}")
+
+def read_outage_events(limit=None):
+    """Read all outage events from log file."""
+    try:
+        if not os.path.exists(OUTAGE_LOG_FILE):
+            return []
+        with open(OUTAGE_LOG_FILE, 'r') as f:
+            lines = f.readlines()
+        if limit:
+            lines = lines[-limit:]
+        return [line.rstrip() for line in lines]
+    except Exception as e:
+        logger.error(f"Error reading outage events: {e}")
+        return []
+
+def clear_outage_events():
+    """Clear all outage events from log file."""
+    try:
+        with open(OUTAGE_LOG_FILE, 'w') as f:
+            pass  # Truncate file
+        logger.info("Cleared outage events log")
+    except Exception as e:
+        logger.error(f"Error clearing outage events: {e}")
+
 # --- Global Metrics Tracking ---
 last_net_sent = psutil.net_io_counters().bytes_sent
 last_net_time = time.time()
 net_out_rate = 0 # Mbps
+cached_network_latency = None
+cached_network_latency_time = 0
 
 # Server outage tracking
 last_network_online = True
@@ -800,13 +859,15 @@ async def monitor_sites_task():
         db = SessionLocal()
         polling_rate = 30.0
         try:
-            global last_network_online, current_outage_type, current_outage_start
+            global last_network_online, current_outage_type, current_outage_start, cached_network_latency, cached_network_latency_time
             alert_settings = db.query(models.Settings).first()
             polling_rate = max(0.5, float(alert_settings.polling_rate or 30.0)) if alert_settings else 30.0
 
             # Check server internet connectivity
             server_online = await asyncio.to_thread(is_internet_reachable)
             net_lat = await asyncio.to_thread(get_external_latency)
+            cached_network_latency = net_lat
+            cached_network_latency_time = time.time()
             
             # Write log to hourly file
             write_hourly_status_log(server_online)
@@ -823,19 +884,14 @@ async def monitor_sites_task():
             confirmed_offline = (host_down_streak == HOST_CONFIRM_THRESHOLD)
             confirmed_online = (host_up_streak == HOST_CONFIRM_THRESHOLD and not last_network_online)
 
-            # Confirmed outage start — open the DB event, no alert sent yet
+            # Confirmed outage start — log to file, no alert sent yet
             if confirmed_offline and last_network_online:
-                new_outage = models.OutageEvent(
-                    outage_type='network',
-                    started_at=datetime.utcnow(),
-                    ended_at=None
-                )
-                db.add(new_outage)
+                log_outage_event('OUTAGE', 'Host internet confirmed offline (Suros monitor)')
                 current_outage_type = 'network'
                 current_outage_start = datetime.utcnow()
                 last_network_online = False
 
-            # Confirmed recovery — close event and send THE single alert
+            # Confirmed recovery — send THE single alert
             if confirmed_online:
                 if current_outage_type == 'network' and current_outage_start:
                     outage_started_at = current_outage_start
@@ -849,12 +905,7 @@ async def monitor_sites_task():
                         offline_at=format_utc_to_local_ampm(outage_started_at, tz),
                         online_at=format_utc_to_local_ampm(reconnected_at, tz)
                     )
-                    open_events = db.query(models.OutageEvent).filter(
-                        models.OutageEvent.outage_type == 'network',
-                        models.OutageEvent.ended_at.is_(None)
-                    ).all()
-                    for ev in open_events:
-                        ev.ended_at = reconnected_at
+                    log_outage_event('RECOVERY', 'Host internet confirmed back online (Suros monitor)')
                     current_outage_type = None
                     current_outage_start = None
                     asyncio.create_task(trigger_system_alert(alert_title, alert_body))
@@ -1034,6 +1085,89 @@ async def startup_event():
 
 # --- API Endpoints ---
 
+@app.get("/api/sites/export")
+def export_sites(db: Session = Depends(get_db)):
+    """Export all monitored sites as JSON."""
+    sites = db.query(models.Site).all()
+    export_data = {
+        "export_date": datetime.utcnow().isoformat(),
+        "site_count": len(sites),
+        "sites": [
+            {
+                "name": site.name,
+                "url": site.url,
+                "icon": site.icon
+            }
+            for site in sites
+        ]
+    }
+    return export_data
+
+@app.post("/api/sites/import")
+def import_sites(import_data: dict, db: Session = Depends(get_db)):
+    """Import sites from export JSON. Optionally clear existing sites first."""
+    try:
+        sites_to_import = import_data.get("sites", [])
+        clear_existing = import_data.get("clear_existing", False)
+        
+        if not isinstance(sites_to_import, list):
+            raise HTTPException(status_code=400, detail="Invalid import format: 'sites' must be a list")
+        
+        if clear_existing:
+            db.query(models.Site).delete()
+            db.commit()
+            logger.info(f"Cleared existing sites during import")
+        
+        imported_count = 0
+        skipped_count = 0
+        errors = []
+        
+        for site_data in sites_to_import:
+            try:
+                # Validate required fields
+                if not site_data.get("name") or not site_data.get("url"):
+                    skipped_count += 1
+                    errors.append(f"Skipped: Missing name or URL - {site_data}")
+                    continue
+                
+                # Check if site already exists (skip duplicates)
+                existing = db.query(models.Site).filter(
+                    models.Site.url == site_data["url"]
+                ).first()
+                
+                if existing:
+                    skipped_count += 1
+                    errors.append(f"Skipped: Site {site_data['url']} already exists")
+                    continue
+                
+                # Add the site
+                new_site = models.Site(
+                    name=site_data["name"],
+                    url=site_data["url"],
+                    icon=site_data.get("icon", "Globe")
+                )
+                db.add(new_site)
+                imported_count += 1
+                
+            except Exception as e:
+                skipped_count += 1
+                errors.append(f"Error importing {site_data.get('url', 'unknown')}: {str(e)}")
+        
+        db.commit()
+        
+        return {
+            "imported": imported_count,
+            "skipped": skipped_count,
+            "errors": errors,
+            "message": f"Imported {imported_count} sites, skipped {skipped_count}"
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Import error: {e}")
+        raise HTTPException(status_code=400, detail=f"Import failed: {str(e)}")
+
 @app.get("/api/sites", response_model=List[SiteSchema])
 def get_sites(db: Session = Depends(get_db)):
     sites = db.query(models.Site).all()
@@ -1108,34 +1242,51 @@ def get_stats(db: Session = Depends(get_db)):
             last_inner_status = h.status
 
     # Network outages are persisted as events, so the count survives restarts.
-    network_outages = db.query(models.OutageEvent).filter(
-        models.OutageEvent.outage_type == 'network',
-        models.OutageEvent.started_at >= yesterday
-    ).count()
+    # Network outages from shared log file (OUTAGE event within last 24 hours)
+    network_outages = 0
+    try:
+        outage_events = read_outage_events()
+        for line in outage_events:
+            if ' | OUTAGE | ' in line:
+                try:
+                    event_time_str = line.split(' | ')[0]
+                    event_time = datetime.strptime(event_time_str, '%Y-%m-%d %H:%M:%S')
+                    if event_time >= yesterday:
+                        network_outages += 1
+                except:
+                    pass
+    except:
+        pass
+    
     _, power_outages = calculate_outages_from_logs()
 
-    # Current ongoing outage
+    # Current ongoing outage (check if last event was OUTAGE without matching RECOVERY)
     current_outage = None
-    open_outage = db.query(models.OutageEvent).filter(
-        models.OutageEvent.ended_at.is_(None)
-    ).first()
-    if open_outage:
-        current_outage = {
-            "type": open_outage.outage_type,
-            "started_at": open_outage.started_at.isoformat()
-        }
-
-    # Network Health (Ping 1.1.1.1)
-    network_latency = None
     try:
-        import socket
-        start = time.time()
-        socket.create_connection(("1.1.1.1", 53), timeout=2)
-        network_latency = round((time.time() - start) * 1000)
+        outage_events = read_outage_events()
+        if outage_events:
+            # Look backwards for OUTAGE without subsequent RECOVERY
+            for i in range(len(outage_events) - 1, -1, -1):
+                if ' | OUTAGE | ' in outage_events[i]:
+                    # Found an outage, check if there's a recovery after it
+                    has_recovery = any(' | RECOVERY | ' in outage_events[j] for j in range(i+1, len(outage_events)))
+                    if not has_recovery:
+                        try:
+                            event_time_str = outage_events[i].split(' | ')[0]
+                            current_outage = {
+                                "type": "network",
+                                "started_at": datetime.strptime(event_time_str, '%Y-%m-%d %H:%M:%S').isoformat()
+                            }
+                        except:
+                            pass
+                    break
     except:
-        network_latency = None
+        pass
 
-    # Uptime percentage calculation (last 2880 checks)
+    # Use cached network latency from monitor_sites_task (updated every poll)
+    network_latency = cached_network_latency
+
+    # Uptime percentage calculation (last 24 hours)
     total_checks = db.query(models.History).filter(models.History.timestamp >= yesterday).count()
     up_checks = db.query(models.History).filter(
         models.History.status == "success",
@@ -1164,8 +1315,8 @@ def get_stats(db: Session = Depends(get_db)):
     }
 
 @app.get("/api/system-history")
-def get_system_history(db: Session = Depends(get_db)):
-    history = db.query(models.SystemHistory).order_by(models.SystemHistory.timestamp.asc()).all()
+def get_system_history(limit: int = 168, db: Session = Depends(get_db)):
+    history = db.query(models.SystemHistory).order_by(models.SystemHistory.timestamp.asc()).limit(limit).all()
     return history
 
 @app.get("/api/logs")
@@ -1190,14 +1341,12 @@ def clear_application_logs():
         raise HTTPException(status_code=500, detail="Unable to clear application logs")
 
 @app.delete("/api/logs/outages")
-def clear_outage_logs(db: Session = Depends(get_db)):
+def clear_outage_logs():
     try:
-        db.query(models.OutageEvent).delete()
-        db.commit()
+        clear_outage_events()
         return {"status": "cleared"}
     except Exception as error:
         logger.error(f"Error clearing outage logs: {error}")
-        db.rollback()
         raise HTTPException(status_code=500, detail="Unable to clear outage logs")
 
 LAST_NET_IO = {"rx": 0, "tx": 0, "time": 0.0}

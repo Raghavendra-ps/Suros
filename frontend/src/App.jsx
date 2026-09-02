@@ -308,19 +308,25 @@ const App = () => {
 
     const init = async () => {
       try {
+        // Load critical items first (fast)
         await Promise.allSettled([
           fetchSettings(),
           fetchSites(),
           fetchStats(),
-          fetchSystemMetrics(),
+          fetchSystemMetrics()
+        ]);
+        setIsLoading(false);
+        
+        // Load background data in parallel (can take longer)
+        Promise.allSettled([
           fetchSystemHistory(),
           fetchDrives(),
           fetchProcesses()
         ]);
       } catch (err) {
         console.error('Error during initial dashboard load:', err);
-      } finally {
         setIsLoading(false);
+      } finally {
         if (!pollingStopped) {
           pollingTimeout = setTimeout(executeDashboardPoll, pollingRate * 1000);
         }
@@ -468,6 +474,55 @@ const App = () => {
       fetchSites();
     } catch (err) {
       console.error('Error deleting site:', err);
+    }
+  };
+
+  const handleExportSites = async () => {
+    try {
+      const res = await axios.get('/api/sites/export');
+      const dataStr = JSON.stringify(res.data, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `suros-sites-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      alert(`Exported ${res.data.site_count} sites`);
+    } catch (err) {
+      console.error('Error exporting sites:', err);
+      alert('Failed to export sites');
+    }
+  };
+
+  const handleImportSites = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    try {
+      const fileContent = await file.text();
+      const importData = JSON.parse(fileContent);
+      
+      const clearExisting = window.confirm(
+        'Clear existing sites before importing? (OK = Clear, Cancel = Merge with existing)'
+      );
+      
+      const res = await axios.post('/api/sites/import', {
+        ...importData,
+        clear_existing: clearExisting
+      });
+      
+      await fetchSites();
+      alert(`Import complete: ${res.data.imported} added, ${res.data.skipped} skipped`);
+      
+      if (res.data.errors.length > 0) {
+        console.warn('Import warnings:', res.data.errors);
+      }
+    } catch (err) {
+      console.error('Error importing sites:', err);
+      alert('Failed to import sites. Check file format.');
+    } finally {
+      e.target.value = '';
     }
   };
 
@@ -1288,13 +1343,36 @@ const App = () => {
                   </span>
                 </span>
               </div>
-              <button
-                className="btn btn-accent"
-                onClick={() => { setEditingSite(null); setNewSite({ name: '', url: '', icon: '' }); setIsModalOpen(true); }}
-                style={{ padding: '4px 10px', fontSize: '0.75rem' }}
-              >
-                + Add Site
-              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  className="btn"
+                  onClick={handleExportSites}
+                  title="Export all sites to JSON file"
+                  style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+                >
+                  ↓ Export
+                </button>
+                <label
+                  className="btn"
+                  title="Import sites from JSON file"
+                  style={{ padding: '4px 10px', fontSize: '0.75rem', cursor: 'pointer', margin: 0 }}
+                >
+                  ↑ Import
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleImportSites}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+                <button
+                  className="btn btn-accent"
+                  onClick={() => { setEditingSite(null); setNewSite({ name: '', url: '', icon: '' }); setIsModalOpen(true); }}
+                  style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+                >
+                  + Add Site
+                </button>
+              </div>
             </div>
             <div className="col-headers">
               <div></div>
