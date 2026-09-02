@@ -214,6 +214,16 @@ def get_localized_timestamp(tz_name="Asia/Kolkata"):
     except Exception:
         return datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
 
+def format_utc_to_local_ampm(utc_dt, tz_name="Asia/Kolkata"):
+    """Convert UTC datetime to local timezone with AM/PM format."""
+    try:
+        import zoneinfo
+        tz = zoneinfo.ZoneInfo(tz_name or "Asia/Kolkata")
+        local_dt = utc_dt.replace(tzinfo=utc_dt.tzinfo or __import__('zoneinfo').ZoneInfo('UTC')).astimezone(tz)
+        return local_dt.strftime('%Y-%m-%d %I:%M:%S %p %Z')
+    except Exception:
+        return utc_dt.strftime('%Y-%m-%d %I:%M:%S %p UTC')
+
 def build_html_email(subject, message, logo_src="", timezone_name="Asia/Kolkata"):
     import base64
     is_restored = "restored" in subject.lower() or "recovered" in subject.lower() or "success" in subject.lower()
@@ -746,17 +756,22 @@ net_out_rate = 0 # Mbps
 last_network_online = True
 current_outage_type = None   # 'network' | 'power'
 current_outage_start = None
+host_down_streak = 0
+host_up_streak = 0
+HOST_CONFIRM_THRESHOLD = 3
 confirmed_site_outages = set()
 site_check_streaks = {}
 
 def is_internet_reachable():
-    """Returns True if internet is reachable (ping 1.1.1.1:53), False otherwise."""
-    try:
-        import socket
-        socket.create_connection(("1.1.1.1", 53), timeout=2)
-        return True
-    except:
-        return False
+    """Returns True if either 1.1.1.1:53 or 8.8.8.8:53 is reachable."""
+    import socket
+    for host, port in [("1.1.1.1", 53), ("8.8.8.8", 53)]:
+        try:
+            socket.create_connection((host, port), timeout=2)
+            return True
+        except:
+            continue
+    return False
 
 def get_external_latency():
     """Ping 1.1.1.1 and return latency in ms. Returns None if unreachable."""
@@ -796,19 +811,43 @@ async def monitor_sites_task():
             # Write log to hourly file
             write_hourly_status_log(server_online)
 
-            # Detect network outage transitions
-            if server_online and not last_network_online:
-                # Network came back online — close the open outage and send one summary alert
+            # Update streaks
+            global host_down_streak, host_up_streak
+            if server_online:
+                host_down_streak = 0
+                host_up_streak += 1
+            else:
+                host_up_streak = 0
+                host_down_streak += 1
+
+            confirmed_offline = (host_down_streak == HOST_CONFIRM_THRESHOLD)
+            confirmed_online = (host_up_streak == HOST_CONFIRM_THRESHOLD and not last_network_online)
+
+            # Confirmed outage start — open the DB event, no alert sent yet
+            if confirmed_offline and last_network_online:
+                new_outage = models.OutageEvent(
+                    outage_type='network',
+                    started_at=datetime.utcnow(),
+                    ended_at=None
+                )
+                db.add(new_outage)
+                current_outage_type = 'network'
+                current_outage_start = datetime.utcnow()
+                last_network_online = False
+
+            # Confirmed recovery — close event and send THE single alert
+            if confirmed_online:
                 if current_outage_type == 'network' and current_outage_start:
                     outage_started_at = current_outage_start
                     reconnected_at = datetime.utcnow()
+                    tz = getattr(alert_settings, 'timezone', 'Asia/Kolkata') or 'Asia/Kolkata'
                     alert_title, alert_body = alert_template(
                         alert_settings,
                         "host_recovery_title", "host_recovery_body",
                         "Host Network Restored",
                         "System was offline but is back up.\nServer lost connection on: {offline_at} & re-connected at: {online_at}",
-                        offline_at=outage_started_at.strftime('%Y-%m-%d %H:%M:%S UTC'),
-                        online_at=reconnected_at.strftime('%Y-%m-%d %H:%M:%S UTC')
+                        offline_at=format_utc_to_local_ampm(outage_started_at, tz),
+                        online_at=format_utc_to_local_ampm(reconnected_at, tz)
                     )
                     open_events = db.query(models.OutageEvent).filter(
                         models.OutageEvent.outage_type == 'network',
@@ -818,23 +857,9 @@ async def monitor_sites_task():
                         ev.ended_at = reconnected_at
                     current_outage_type = None
                     current_outage_start = None
-                    asyncio.create_task(trigger_system_alert(
-                        alert_title,
-                        alert_body
-                    ))
-
-            if not server_online and last_network_online:
-                # Network went offline — start a new outage
-                new_outage = models.OutageEvent(
-                    outage_type='network',
-                    started_at=datetime.utcnow(),
-                    ended_at=None
-                )
-                db.add(new_outage)
-                current_outage_type = 'network'
-                current_outage_start = datetime.utcnow()
-
-            last_network_online = server_online
+                    asyncio.create_task(trigger_system_alert(alert_title, alert_body))
+                last_network_online = True
+                host_down_streak = 0
 
             # Update Site Metrics
             sites = db.query(models.Site).all()

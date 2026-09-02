@@ -22,7 +22,6 @@ const Icon = ({ name, size = 16, ...props }) => {
 
 const ICONS = Object.keys(IconMap);
 const templateDefinitions = [
-  ['host_outage', 'Host Offline'],
   ['host_recovery', 'Host Recovery'],
   ['site_outage', 'Site Offline'],
   ['site_recovery', 'Site Recovery']
@@ -147,7 +146,7 @@ const App = () => {
     timezone: 'Asia/Kolkata'
   });
   const [activeSettingsTab, setActiveSettingsTab] = useState('email');
-  const [activeTemplateKey, setActiveTemplateKey] = useState('host_outage');
+  const [activeTemplateKey, setActiveTemplateKey] = useState('host_recovery');
   const [focusedTemplateField, setFocusedTemplateField] = useState(null);
   const [templateDropTarget, setTemplateDropTarget] = useState(null);
   const [logs, setLogs] = useState({ entries: [] });
