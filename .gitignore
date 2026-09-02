@@ -1,5 +1,5 @@
 # Python
-__pycache__/
+**/__pycache__/
 *.py[cod]
 *.pyo
 .Python
@@ -32,3 +32,4 @@ pnpm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+*.bak

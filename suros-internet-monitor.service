@@ -6,7 +6,7 @@ StartLimitIntervalSec=60s
 
 [Service]
 Type=simple
-ExecStart=/root/suros-internet-monitor.sh
+ExecStart=/bin/bash suros-internet-monitor.sh
 Restart=always
 RestartSec=5
 StandardOutput=journal

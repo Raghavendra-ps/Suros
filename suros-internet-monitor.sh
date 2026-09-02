@@ -1,8 +1,11 @@
 #!/bin/bash
 
-OUTAGE_LOG_FILE="${OUTAGE_LOG_FILE:-/root/suros-outages.log}"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OUTAGE_LOG_FILE="${OUTAGE_LOG_FILE:-$DIR/backend/logs/suros-outages.log}"
 CHECK_INTERVAL=10
 CONFIRM_THRESHOLD=3
+
+mkdir -p "$(dirname "$OUTAGE_LOG_FILE")"
 
 up_streak=0
 down_streak=0
@@ -12,6 +15,7 @@ log_event() {
     local event_type=$1
     local message=$2
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    mkdir -p "$(dirname "$OUTAGE_LOG_FILE")"
     echo "$timestamp | $event_type | $message" >> "$OUTAGE_LOG_FILE"
 }
 

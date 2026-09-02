@@ -95,11 +95,13 @@ main() {
     fi
     print_status "Docker Compose is available"
     
-    if [ ! -d "/root/Suros" ]; then
-        print_error "Suros directory not found at /root/Suros"
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+    if [ ! -f "$SCRIPT_DIR/docker-compose.yml" ]; then
+        print_error "docker-compose.yml not found in $SCRIPT_DIR"
         exit 1
     fi
-    print_status "Suros directory found"
+    print_status "Suros directory found at $SCRIPT_DIR"
     
     if ! command -v systemctl &> /dev/null; then
         print_error "Systemd is not available"
@@ -120,63 +122,16 @@ main() {
     # Systemd service setup
     printf "\n${WHITE}Setting up Systemd Service${NC}\n"
     
-    print_info "Creating internet monitor script..."
+    print_info "Configuring internet monitor script..."
     
-    # Create the internet monitor script
-    cat > /root/suros-internet-monitor.sh << 'EOF'
-#!/bin/bash
-
-OUTAGE_LOG_FILE="${OUTAGE_LOG_FILE:-/root/suros-outages.log}"
-CHECK_INTERVAL=10
-CONFIRM_THRESHOLD=3
-
-up_streak=0
-down_streak=0
-last_state="online"
-
-log_event() {
-    local event_type=$1
-    local message=$2
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo "$timestamp | $event_type | $message" >> "$OUTAGE_LOG_FILE"
-}
-
-is_internet_reachable() {
-    if timeout 3 bash -c "echo > /dev/tcp/1.1.1.1/53" 2>/dev/null; then
-        return 0
-    fi
-    if timeout 3 bash -c "echo > /dev/tcp/8.8.8.8/53" 2>/dev/null; then
-        return 0
-    fi
-    return 1
-}
-
-while true; do
-    if is_internet_reachable; then
-        up_streak=$((up_streak + 1))
-        down_streak=0
-        if [ $up_streak -eq $CONFIRM_THRESHOLD ] && [ "$last_state" = "offline" ]; then
-            log_event "RECOVERY" "Internet connectivity restored"
-            last_state="online"
-        fi
-    else
-        down_streak=$((down_streak + 1))
-        up_streak=0
-        if [ $down_streak -eq $CONFIRM_THRESHOLD ] && [ "$last_state" != "offline" ]; then
-            log_event "OUTAGE" "Internet connectivity lost"
-            last_state="offline"
-        fi
-    fi
-    sleep $CHECK_INTERVAL
-done
-EOF
-    chmod +x /root/suros-internet-monitor.sh
-    print_status "Internet monitor script created"
+    MONITOR_SCRIPT="$SCRIPT_DIR/suros-internet-monitor.sh"
+    chmod +x "$MONITOR_SCRIPT"
+    print_status "Internet monitor script configured"
     
     print_info "Creating systemd service..."
     
     # Create systemd service file
-    cat > /etc/systemd/system/suros-internet-monitor.service << 'EOF'
+    cat > /etc/systemd/system/suros-internet-monitor.service << EOF
 [Unit]
 Description=Suros Internet Monitoring Service
 After=network.target
@@ -185,7 +140,8 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=root
-ExecStart=/root/suros-internet-monitor.sh
+WorkingDirectory=$SCRIPT_DIR
+ExecStart=$MONITOR_SCRIPT
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -216,8 +172,7 @@ EOF
     
     print_info "Updating configuration..."
     
-    # Update docker-compose.yml with custom ports
-    cd /root/Suros
+    cd "$SCRIPT_DIR"
     
     # Backup original
     if [ ! -f docker-compose.yml.bak ]; then
@@ -243,18 +198,18 @@ EOF
         exit 1
     fi
     
-    print_info "Waiting for services to start (30-60 seconds)..."
-    sleep 30
+    print_info "Waiting for services to start (15-30 seconds)..."
+    sleep 15
     
     # Verify services
     printf "\n${WHITE}Verification${NC}\n"
-    if docker compose ps | grep -q "suros-backend.*Up"; then
+    if docker compose ps | grep -qi "backend.*running\|backend.*up"; then
         print_status "Backend is running"
     else
         print_error "Backend failed to start"
     fi
     
-    if docker compose ps | grep -q "suros-frontend.*Up"; then
+    if docker compose ps | grep -qi "frontend.*running\|frontend.*up"; then
         print_status "Frontend is running"
     else
         print_error "Frontend failed to start"
@@ -268,10 +223,10 @@ EOF
     
     printf "${WHITE}Useful commands:${NC}\n"
     printf "  View logs:     journalctl -u suros-internet-monitor -f\n"
-    printf "  View outages:  tail -f /root/suros-outages.log\n"
+    printf "  View outages:  tail -f $SCRIPT_DIR/backend/logs/suros-outages.log\n"
     printf "  Check status:  systemctl status suros-internet-monitor\n"
     printf "  Stop service:  sudo systemctl stop suros-internet-monitor\n"
-    printf "  Restart all:   cd /root/Suros && docker compose restart\n\n"
+    printf "  Restart all:   cd $SCRIPT_DIR && docker compose restart\n\n"
 }
 
 # Run main function

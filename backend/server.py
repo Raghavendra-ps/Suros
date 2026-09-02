@@ -27,7 +27,7 @@ LOG_DIR = os.getenv("LOG_DIR", "/app/logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 APP_LOG_FILE = os.path.join(LOG_DIR, "app.log")
 STATUS_LOG_FILE = os.path.join(LOG_DIR, "status.log")
-OUTAGE_LOG_FILE = os.getenv("OUTAGE_LOG_FILE", "/root/suros-outages.log")  # Shared with systemd monitor
+OUTAGE_LOG_FILE = os.getenv("OUTAGE_LOG_FILE", os.path.join(LOG_DIR, "suros-outages.log"))
 
 logging.basicConfig(
     level=logging.INFO,
@@ -257,7 +257,7 @@ def build_html_email(subject, message, logo_src="", timezone_name="Asia/Kolkata"
     if not logo_src:
         for logo_path in [
             os.path.join(STATIC_DIR, "suros-header-combo-light.png"),
-            "/root/Suros/backend/static/suros-header-combo-light.png",
+            os.path.join(os.path.dirname(__file__), "static", "suros-header-combo-light.png"),
             "/app/static/suros-header-combo-light.png",
             "static/suros-header-combo-light.png"
         ]:
@@ -353,7 +353,7 @@ def _send_smtp_sync(smtp_server, smtp_port, username, password, recipient, subje
     logo_data = None
     for logo_path in [
         os.path.join(STATIC_DIR, "suros-header-combo-light.png"),
-        "/root/Suros/backend/static/suros-header-combo-light.png",
+        os.path.join(os.path.dirname(__file__), "static", "suros-header-combo-light.png"),
         "/app/static/suros-header-combo-light.png",
         "static/suros-header-combo-light.png"
     ]:

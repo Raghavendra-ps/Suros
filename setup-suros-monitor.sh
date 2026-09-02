@@ -13,17 +13,20 @@ if [[ -f /etc/systemd/system/suros-internet-monitor.service ]]; then
     exit 0
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MONITOR_SCRIPT="$SCRIPT_DIR/suros-internet-monitor.sh"
+
 # Check if script exists
-if [[ ! -f /root/suros-internet-monitor.sh ]]; then
-    echo "❌ Error: /root/suros-internet-monitor.sh not found!"
+if [[ ! -f "$MONITOR_SCRIPT" ]]; then
+    echo "❌ Error: $MONITOR_SCRIPT not found!"
     exit 1
 fi
 
 # Ensure script is executable
-chmod +x /root/suros-internet-monitor.sh
+chmod +x "$MONITOR_SCRIPT"
 
 # Create systemd service file
-sudo tee /etc/systemd/system/suros-internet-monitor.service > /dev/null << 'EOF'
+sudo tee /etc/systemd/system/suros-internet-monitor.service > /dev/null << EOF
 [Unit]
 Description=Suros Host Internet Outage Monitor
 After=network.target
@@ -32,7 +35,7 @@ StartLimitIntervalSec=60s
 
 [Service]
 Type=simple
-ExecStart=/root/suros-internet-monitor.sh
+ExecStart=$MONITOR_SCRIPT
 Restart=always
 RestartSec=5
 StandardOutput=journal
