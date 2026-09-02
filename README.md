@@ -100,7 +100,53 @@ git clone https://github.com/yourusername/suros.git
 cd suros
 ```
 
-### 2. Backend
+### 2. Quick Setup (Recommended)
+
+Run this single script to set up everything automatically:
+
+```bash
+sudo bash /root/setup-suros.sh
+```
+
+This script will:
+- ✅ Install systemd internet monitoring service for host-level outage tracking
+- ✅ Configure custom ports (backend: 7689, frontend: 8755 by default)
+- ✅ Build and start Docker containers
+- ✅ Verify all services are running
+
+**Expected duration:** 2-3 minutes
+
+### 3. Manual Setup (If Preferred)
+
+If you prefer to set things up step-by-step:
+
+#### Step 1: Start Suros
+
+```bash
+cd /root/Suros
+docker-compose up -d --build
+```
+
+#### Step 2: Setup Systemd Monitoring (One-Time Only)
+
+```bash
+bash /root/setup-suros-monitor.sh
+```
+
+#### Step 3: Verify Everything
+
+```bash
+# Check if monitoring service is running
+sudo systemctl status suros-internet-monitor
+
+# View outage logs
+sudo journalctl -u suros-internet-monitor -f
+
+# Access dashboard
+http://localhost:8755
+```
+
+### 7. Backend
 
 ```bash
 cd backend
@@ -110,7 +156,7 @@ pip install -r requirements.txt
 uvicorn server:app --host 0.0.0.0 --port 8000
 ```
 
-### 3. Frontend
+### 8. Frontend
 
 ```bash
 cd frontend
@@ -120,7 +166,7 @@ npm run dev
 
 The dev server proxies `/api` requests to `localhost:8000` by default. Update `vite.config.js` if your backend runs on a different port.
 
-### 4. Production Build
+### 9. Production Build
 
 ```bash
 cd frontend
