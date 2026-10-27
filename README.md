@@ -265,4 +265,4 @@ Re-run `sudo bash setup-suros.sh` and pick different ports.
 
 ## License
 
-[MIT](LICENSE)
+[View License](LICENSE)
