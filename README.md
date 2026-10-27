@@ -1,6 +1,6 @@
 # SUROS - Server Uptime & Resource Observability System
 
-## 🚀 Quick Setup (Recommended)
+## Quick Setup (Recommended)
 
 Run this single command from inside the cloned repository to configure everything automatically:
 
@@ -11,10 +11,10 @@ sudo bash setup-suros.sh
 **Expected duration:** 2-3 minutes
 
 This script will:
-- ✅ Install systemd internet monitoring service for host-level outage tracking
-- ✅ Configure custom ports (backend: 7689, frontend: 8755 by default)
-- ✅ Build and start Docker containers
-- ✅ Verify all services are running
+- Install systemd internet monitoring service for host-level outage tracking
+- Configure custom ports (backend: 7689, frontend: 8755 by default)
+- Build and start Docker containers
+- Verify all services are running
 
 ---
 
@@ -47,7 +47,7 @@ http://localhost:8755
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 | File | Purpose |
 |------|---------|
@@ -60,7 +60,7 @@ http://localhost:8755
 
 ---
 
-## 🛠️ Backend
+## Backend
 
 ```bash
 cd backend
@@ -72,7 +72,7 @@ uvicorn server:app --host 0.0.0.0 --port 8000
 
 ---
 
-## 🎨 Frontend
+## Frontend
 
 ```bash
 cd frontend
@@ -84,7 +84,7 @@ The dev server proxies `/api` requests to `localhost:8000` by default.
 
 ---
 
-## 📦 Production Build
+## Production Build
 
 ```bash
 cd frontend
@@ -116,7 +116,7 @@ server {
 
 ---
 
-## 🌐 API Endpoints
+## API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -135,7 +135,7 @@ server {
 
 ---
 
-## 🌐 Deployment Options
+## Deployment Options
 
 ### Option 1: Docker (Recommended)
 
@@ -158,7 +158,7 @@ Install dependencies directly:
 
 ---
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -199,7 +199,7 @@ sudo bash setup-suros.sh
 
 ---
 
-## 📄 License
+## License
 
 MIT — do whatever you want with it.
 
