@@ -1,66 +1,94 @@
-# SUROS - Server Uptime & Resource Observability System
+<div align="center">
 
-## Quick Setup (Recommended)
+# SUROS
 
-Run this single command from inside the cloned repository to configure everything automatically:
+**Server Uptime & Resource Observability System**
+
+A self-hosted dashboard for monitoring websites, system resources, drives and internet outages on your own hardware.
+
+![License](https://img.shields.io/badge/license-MIT-blue)
+![Backend](https://img.shields.io/badge/backend-FastAPI-009688?logo=fastapi&logoColor=white)
+![Frontend](https://img.shields.io/badge/frontend-React-61dafb?logo=react&logoColor=black)
+![Docker](https://img.shields.io/badge/deploy-Docker-2496ed?logo=docker&logoColor=white)
+
+</div>
+
+## Features
+
+- Website uptime and latency checks with per-site history
+- Live CPU, RAM, GPU, disk and network metrics with sparklines
+- Drive list with SMART data and custom drive names
+- Top processes by CPU and memory
+- Host-level internet outage tracking via a systemd service
+- Outage alerts by email (Gmail, Outlook, iCloud, Resend) and [ntfy](https://ntfy.sh)
+- Dark and light themes
+
+## Contents
+
+- [Quick start](#quick-start)
+- [Manual setup](#manual-setup)
+- [Configuration](#configuration)
+- [Development](#development)
+- [Production build](#production-build)
+- [API](#api)
+- [Project structure](#project-structure)
+- [Theming](#theming)
+- [Troubleshooting](#troubleshooting)
+- [Roadmap](#roadmap)
+- [License](#license)
+
+## Quick start
+
+From inside the cloned repository:
 
 ```bash
 sudo bash setup-suros.sh
 ```
 
-**Expected duration:** 2-3 minutes
+The script takes about 2-3 minutes and will:
 
-This script will:
-- Install systemd internet monitoring service for host-level outage tracking
-- Configure custom ports (backend: 7689, frontend: 8755 by default)
-- Build and start Docker containers
-- Verify all services are running
+1. Install the systemd internet monitor
+2. Ask for ports (defaults: backend `7689`, frontend `8755`)
+3. Build and start the Docker containers
+4. Check that everything is running
 
----
+Then open <http://localhost:8755>.
 
-## 📋 Manual Setup (If Preferred)
+> [!NOTE]
+> The setup script needs `sudo` to install the systemd service. If you would rather not run it, use the manual steps below.
 
-### Step 1: Start Suros
+## Manual setup
 
 ```bash
+# 1. Start the containers
 docker compose up -d --build
-```
 
-### Step 2: Setup Systemd Monitoring (One-Time Only)
-
-```bash
+# 2. Install the internet monitor (once)
 bash setup-suros-monitor.sh
-```
 
-### Step 3: Verify Everything
-
-```bash
-# Check if monitoring service is running
+# 3. Verify
 sudo systemctl status suros-internet-monitor
-
-# View outage logs
 sudo journalctl -u suros-internet-monitor -f
-
-# Access dashboard
-http://localhost:8755
 ```
 
----
+To run without Docker, you need Python 3.10+ (with `psutil` and `smartmontools`), Node.js 18+, and systemd for the monitor service. See [Development](#development).
 
-## Repository Structure
+## Configuration
 
-| File | Purpose |
-|------|---------|
-| `setup-suros.sh` | Main automated setup script (TUI with progress bars) |
-| `setup-suros-monitor.sh` | Systemd internet monitoring script |
-| `README.md` | Main project documentation |
-| `docker-compose.yml` | Docker Compose orchestration |
-| `backend/` | FastAPI backend |
-| `frontend/` | React frontend |
+Everything is set from the Settings drawer (gear icon in the header). There are no config files to edit. Settings are stored in the backend database and survive restarts.
 
----
+| Setting | Description |
+|---|---|
+| Email provider | Gmail, Outlook, iCloud or Resend |
+| SMTP credentials | Username, app password, server, port |
+| Recipient | Address that receives outage alerts |
+| ntfy URL | Your ntfy server (default `https://ntfy.sh`) |
+| ntfy topic | Topic to publish to |
+| ntfy token | Optional bearer token for private topics |
 
-## Backend
+## Development
+
+**Backend**
 
 ```bash
 cd backend
@@ -70,9 +98,7 @@ pip install -r requirements.txt
 uvicorn server:app --host 0.0.0.0 --port 8000
 ```
 
----
-
-## Frontend
+**Frontend**
 
 ```bash
 cd frontend
@@ -80,19 +106,22 @@ npm install
 npm run dev
 ```
 
-The dev server proxies `/api` requests to `localhost:8000` by default.
+The dev server proxies `/api` to `localhost:8000`.
 
----
+> [!NOTE]
+> Port `8000` is for local development only. The Docker setup uses the ports you choose during setup (`7689` / `8755` by default).
 
-## Production Build
+## Production build
 
 ```bash
 cd frontend
 npm run build
-# Serve the dist/ folder via Nginx or any static host
 ```
 
-Example Nginx config:
+Serve `frontend/dist` with Nginx or any static host and proxy `/api` to the backend.
+
+<details>
+<summary>Example Nginx config</summary>
 
 ```nginx
 server {
@@ -114,182 +143,119 @@ server {
 }
 ```
 
----
+</details>
 
-## API Endpoints
+## API
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/status` | System health summary |
-| `GET` | `/api/sites` | Monitored websites list |
-| `POST` | `/api/sites` | Add a website |
-| `PUT` | `/api/sites/{id}` | Update a website |
-| `DELETE` | `/api/sites/{id}` | Remove a website |
-| `POST` | `/api/sites/{id}/check` | Trigger immediate check |
-| `GET` | `/api/system` | CPU, RAM, disk usage |
-| `GET` | `/api/logs` | Suros log file list |
-| `GET` | `/api/logs/{type}` | Get specific log file |
-| `DELETE` | `/api/logs/all` | Clear all log files |
-| `DELETE` | `/api/logs/application` | Clear application logs only |
+| Method | Path | Description |
+|---|---|---|
 | `GET` | `/health` | Backend health check |
+| `GET` | `/api/sites` | Monitored sites with status and history |
+| `POST` | `/api/sites` | Add a site |
+| `PUT` | `/api/sites/{id}` | Update a site |
+| `DELETE` | `/api/sites/{id}` | Remove a site |
+| `POST` | `/api/sites/{id}/check` | Run a check immediately |
+| `GET` | `/api/stats` | Aggregate uptime, latency and outage counts |
+| `GET` | `/api/system-metrics` | Live CPU, RAM, GPU, disk and network rates |
+| `GET` | `/api/system-history` | Historical metrics for sparklines |
+| `GET` | `/api/drives` | Drives with SMART data |
+| `POST` | `/api/drives/alias` | Set a friendly drive name |
+| `GET` | `/api/processes` | Top processes by CPU and memory |
+| `GET` | `/api/settings` | Read alert settings |
+| `PUT` | `/api/settings` | Update alert settings |
+| `POST` | `/api/settings/test-notification` | Send a test alert |
+| `GET` | `/api/logs` | List log files |
+| `GET` | `/api/logs/{type}` | Read a specific log file |
+| `DELETE` | `/api/logs/application` | Clear application logs |
+| `DELETE` | `/api/logs/all` | Clear all logs |
 
----
+## Project structure
 
-## Deployment Options
-
-### Option 1: Docker (Recommended)
-
-```bash
-sudo bash setup-suros.sh
+```text
+suros/
+├── backend/
+│   ├── server.py            # FastAPI app and routes
+│   ├── requirements.txt
+│   ├── uptime.db            # SQLite database (auto-created, gitignored)
+│   └── logs/                # Status and application logs (gitignored)
+├── frontend/
+│   ├── public/              # Logos
+│   ├── src/
+│   │   ├── App.jsx          # Dashboard component
+│   │   └── Dashboard.css    # Styles and theme variables
+│   ├── index.html
+│   └── vite.config.js
+├── docker-compose.yml
+├── setup-suros.sh           # Automated setup
+├── setup-suros-monitor.sh   # Systemd internet monitor setup
+└── README.md
 ```
 
-### Option 2: Manual Docker
+## Theming
 
-```bash
-docker compose up -d --build
+All colours are CSS custom properties, set per theme on `:root[data-theme]` and toggled through a data attribute on `<html>`. Edit the variables at the top of `frontend/src/Dashboard.css`:
+
+```css
+:root[data-theme="dark"] {
+  --bg: #0f0e0d;
+  --accent: #c84b2f;    /* primary accent */
+  --up: #2fa87e;        /* online */
+  --down: #c84b2f;      /* offline */
+  --degraded: #e08c2f;  /* slow */
+}
 ```
-
-### Option 3: Native (Bare Metal)
-
-Install dependencies directly:
-- Python 3.10+ with psutil, smartmontools
-- Node.js 18+ with React, Tailwind
-- Systemd for the internet monitor service
-
----
 
 ## Troubleshooting
 
-### Common Issues
+<details>
+<summary>Backend won't start</summary>
 
-**Backend won't start?**
 ```bash
 docker compose logs backend
 ```
 
-**Frontend shows 502?**
-```bash
-# Check if backend is running
-curl -s http://localhost:7689/api/settings | head -5
+</details>
 
-# Restart containers
+<details>
+<summary>Frontend shows 502</summary>
+
+Check that the backend is up, then restart:
+
+```bash
+curl -s http://localhost:7689/health
 docker compose restart
 ```
 
-**Systemd service not running?**
+</details>
+
+<details>
+<summary>Systemd monitor not running</summary>
+
 ```bash
 sudo systemctl status suros-internet-monitor
 sudo systemctl restart suros-internet-monitor
 ```
 
-**Port already in use?**
+</details>
+
+<details>
+<summary>Port already in use</summary>
+
 ```bash
-# Check what's using the port
 sudo lsof -i :7689
-
-# Choose different ports via setup script
-sudo bash setup-suros.sh
 ```
 
-### Log Files
+Re-run `sudo bash setup-suros.sh` and pick different ports.
 
-- `backend/logs/suros-outages.log` - Outage events (written by both Suros and systemd)
-- `backend/logs/app.log` - Application logs
-- `backend/logs/status.log` - Status check history
+</details>
 
----
+**Log files** (in `backend/logs/`)
 
-## License
-
-MIT — do whatever you want with it.
-
----
-
-<div align="center">
-  <sub>Built for Homelabs. Runs on the metal.</sub>
-</div>
-
----
-
-## Configuration
-
-All settings are managed through the in-app Settings drawer (⚙ icon in the header). No config files to edit manually.
-
-| Setting | Description |
+| File | Contents |
 |---|---|
-| Email Provider | Gmail / Outlook / iCloud / Resend |
-| SMTP Credentials | Username, app password, server, port |
-| Recipient | Where outage alerts are sent |
-| ntfy URL | Your ntfy server (default: `https://ntfy.sh`) |
-| ntfy Topic | The topic to publish to |
-| ntfy Token | Optional Bearer token for private topics |
-
-Settings are persisted to the backend database and survive restarts.
-
----
-
-## API Endpoints
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/sites` | All monitored sites with status + history |
-| `POST` | `/api/sites` | Add a new site |
-| `PUT` | `/api/sites/:id` | Update a site |
-| `DELETE` | `/api/sites/:id` | Remove a site |
-| `GET` | `/api/stats` | Aggregate uptime, latency, outage counts |
-| `GET` | `/api/system-metrics` | Live CPU, RAM, GPU, disk, network rates |
-| `GET` | `/api/system-history` | Historical system metrics for sparklines |
-| `GET` | `/api/drives` | Drive list with SMART data |
-| `POST` | `/api/drives/alias` | Set a friendly name for a drive |
-| `GET` | `/api/processes` | Top processes by CPU/memory |
-| `GET` | `/api/settings` | Fetch current alert settings |
-| `PUT` | `/api/settings` | Update alert settings |
-| `POST` | `/api/settings/test-notification` | Send a test alert |
-| `GET` | `/api/logs` | Read recent application log entries |
-| `DELETE` | `/api/logs/application` | Clear application logs only |
-| `GET` | `/health` | Backend health check |
-
----
-
-## Project Structure
-
-```
-suros/
-├── backend/
-│   ├── server.py            # FastAPI app + all routes
-│   ├── requirements.txt
-│   ├── uptime.db            # SQLite database (auto-created, ignored)
-│   └── logs/                # Status and application logs (ignored)
-├── frontend/
-│   ├── public/
-│   │   ├── suros-logo-dark.png
-│   │   └── suros-logo-light.png
-│   ├── src/
-│   │   ├── App.jsx          # Main dashboard component
-│   │   └── Dashboard.css    # All styles + CSS variable theming
-│   ├── index.html
-│   └── vite.config.js
-└── README.md
-```
-
----
-
-## Theming
-
-SUROS uses CSS custom properties for all colours. Both dark and light themes are defined on `:root[data-theme]` and toggled via a data attribute on `<html>`. To customise, edit the variables at the top of `Dashboard.css`:
-
-```css
-:root[data-theme="dark"] {
-  --bg: #0f0e0d;
-  --accent: #c84b2f;   /* primary accent (red-orange) */
-  --up: #2fa87e;       /* online / healthy (green) */
-  --down: #c84b2f;     /* offline / error (red) */
-  --degraded: #e08c2f; /* slow / warning (orange) */
-  /* ... */
-}
-```
-
----
+| `suros-outages.log` | Outage events, written by both Suros and the systemd service |
+| `app.log` | Application log |
+| `status.log` | Status check history |
 
 ## Roadmap
 
@@ -297,14 +263,6 @@ SUROS uses CSS custom properties for all colours. Both dark and light themes are
 - [ ] Ping/traceroute panel
 - [ ] Public status page mode
 
----
-
 ## License
 
-MIT — do whatever you want with it.
-
----
-
-<div align="center">
-  <sub>Built for Homelabs. Runs on the metal.</sub>
-</div>
+[MIT](LICENSE)
